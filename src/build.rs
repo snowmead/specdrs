@@ -28,6 +28,14 @@ use syn::{
 
 use crate::prelude::*;
 
+use specdrs_syntax::{
+    impl_cannot_own_claims,
+    impl_span_requires_entry,
+    specdrs_module_requires_in_spans,
+    specdrs_requires_arguments,
+    specdrs_span_requires_entry, //
+};
+
 use crate::attribute::{
     ClaimArgs,
     ClaimsArgs,
@@ -552,7 +560,9 @@ impl Scanner {
                                     entry.insert(item);
                                 }
                                 (false, false) => {
-                                    self.errors.push(format!("duplicate item path `{path}`"));
+                                    self.errors.push(format!(
+                                        "duplicate item path `{path}`. Two annotated items resolved to the same definition path. Give one a distinct identity, or drop the extra annotation"
+                                    ));
                                 }
                             }
                         }
@@ -912,8 +922,8 @@ impl FileScan {
                         Directive::Span(declaration) => {
                             let Some(entry) = declaration.entry.clone() else {
                                 self.errors.push(format!(
-                                    "{display_file}:{line}: span `{}` declared on an impl block requires `entry`; an impl block has no def path to default to",
-                                    declaration.id
+                                    "{display_file}:{line}: {}",
+                                    impl_span_requires_entry(&declaration.id)
                                 ));
                                 continue;
                             };
@@ -929,7 +939,8 @@ impl FileScan {
                             });
                         }
                         Directive::Claims(_) => self.errors.push(format!(
-                            "{display_file}:{line}: an impl block cannot own claims; declare `span(...)` on the impl block, or move `claims(...)` to the implemented type or one method"
+                            "{display_file}:{line}: {}",
+                            impl_cannot_own_claims()
                         )),
                     }
                 }
@@ -1059,7 +1070,8 @@ fn parse_annotations(
     }) {
         let syn::Meta::List(list) = &attr.meta else {
             errors.push(format!(
-                "{file}:{line}: specdrs requires arguments"
+                "{file}:{line}: {}",
+                specdrs_requires_arguments()
             ));
             continue;
         };
@@ -1161,7 +1173,8 @@ fn module_span_declarations(
         };
         let Some(entry) = span.entry else {
             errors.push(format!(
-                "{file}:{line}: specdrs_span! requires `entry`"
+                "{file}:{line}: {}",
+                specdrs_span_requires_entry()
             ));
             continue;
         };
@@ -1230,9 +1243,10 @@ fn module_memberships(
                 .any(|directive| !matches!(directive, Directive::InSpans(_)))
         {
             errors.push(format!(
-                "{}:{}: specdrs_module! requires one or more in_spans directives",
+                "{}:{}: {}",
                 file,
-                item.span().start().line
+                item.span().start().line,
+                specdrs_module_requires_in_spans()
             ));
             continue;
         }
@@ -1670,7 +1684,9 @@ impl MapAssembler {
         validate_container_spans(&spans, &container_members, &mut errors);
         for (path, draft) in &item_drafts {
             if draft.claims.len() > 1 {
-                errors.push(format!("item:{path} has more than one claims block"));
+                errors.push(format!(
+                    "item:{path} has more than one claims block. Put every claim for this item in a single claims(...) directive. Stacked #[specdrs] attributes may add span(...) and in_spans(...), but only one claims(...) block"
+                ));
             }
         }
 
@@ -1783,13 +1799,15 @@ fn resolve_item_reference(
         Some([candidate]) => candidate.clone(),
         Some(candidates) => {
             errors.push(format!(
-                "span `{span_id}` entry `{path}` is ambiguous; candidates: {}",
+                "span `{span_id}` entry `{path}` is ambiguous; candidates: {}. Point entry at one fully qualified item path",
                 candidates.join(", ")
             ));
             path.to_owned()
         }
         _ => {
-            errors.push(format!("span `{span_id}` has missing entry `{path}`"));
+            errors.push(format!(
+                "span `{span_id}` has missing entry `{path}`. entry must name a scanned Rust item: a function, type, trait, module, const, static, or impl method. Point it at an existing item, or add that item"
+            ));
             path.to_owned()
         }
     }
@@ -1877,7 +1895,7 @@ fn validate_container_spans(
             .filter(|member| Some(member.as_str()) != entry && !seeded.contains(*member))
         {
             errors.push(format!(
-                "span `{id}` is declared on the container at {container}, but `{member}` joins it from outside; declare the span with specdrs_span! and reference it from both, or give it a parent and join the parent instead"
+                "span `{id}` is declared on the container at {container}, but `{member}` joins it from outside. A container-declared span only covers items inside that container. For a cross-boundary grouping, declare the span with specdrs_span! and join it from both sides with in_spans, or give this span a parent and join the parent instead"
             ));
         }
     }
@@ -1900,22 +1918,31 @@ fn validate_container_spans(
 fn validate_spans(spans: &BTreeMap<String, SpanDraft>, errors: &mut Vec<String>) {
     for (id, span) in spans {
         if id.trim().is_empty() {
-            errors.push("span id must not be empty".to_owned());
+            errors.push(
+                "span id must not be empty. Write span(id = \"checkout\", ...) or specdrs_span!(id = \"checkout\", entry = ...)"
+                    .to_owned(),
+            );
         }
         if span.declarations.len() != 1 {
             errors.push(format!(
-                "span `{id}` requires exactly one declaration; found {}",
+                "span `{id}` requires exactly one declaration; found {}. Declare a span once with span(...) or specdrs_span!. Other items join it with in_spans(...) or specdrs_module!(in_spans(...))",
                 span.declarations.len()
             ));
             continue;
         }
         if let Some(parent) = span.declarations[0].parent.as_ref() {
             if parent.trim().is_empty() {
-                errors.push(format!("span `{id}` has an empty parent id"));
+                errors.push(format!(
+                    "span `{id}` has an empty parent id. Write parent = \"payments\" or omit parent"
+                ));
             } else if parent == id {
-                errors.push(format!("span `{id}` cannot be its own parent"));
+                errors.push(format!(
+                    "span `{id}` cannot be its own parent. Point parent at an enclosing span, or omit parent for a root span"
+                ));
             } else if !spans.contains_key(parent) {
-                errors.push(format!("span `{id}` has missing parent `{parent}`"));
+                errors.push(format!(
+                    "span `{id}` has missing parent `{parent}`. Declare `{parent}` with span(...) or specdrs_span! before referencing it, or drop the parent field"
+                ));
             }
         }
     }
@@ -1938,7 +1965,9 @@ fn validate_parent_cycles(spans: &BTreeMap<String, SpanDraft>, errors: &mut Vec<
         let mut current = Some(start.as_str());
         while let Some(id) = current {
             if !seen.insert(id) {
-                errors.push(format!("span parent cycle includes `{id}`"));
+                errors.push(format!(
+                    "span parent cycle includes `{id}`. parent must name an ancestor, not a descendant or sibling that points back. Break the cycle by pointing one span at a true parent or dropping the parent field"
+                ));
                 break;
             }
             current = spans.get(id).and_then(|span| {
@@ -1985,7 +2014,8 @@ fn build_axes(
     for not_applicable in not_applicable {
         if not_applicable.reason.trim().is_empty() {
             errors.push(format!(
-                "{scope} marks {} not applicable without a reason",
+                "{scope} marks {} not applicable without a reason. Write NotApplicable({} = \"why this axis does not apply\")",
+                not_applicable.axis,
                 not_applicable.axis
             ));
             continue;
@@ -1995,7 +2025,8 @@ fn build_axes(
             .expect("all axes are initialized");
         if entry.status != AxisStatus::Unspecified {
             errors.push(format!(
-                "{scope} marks {} not applicable more than once",
+                "{scope} marks {} not applicable more than once. Keep a single NotApplicable({} = \"reason\") entry",
+                not_applicable.axis,
                 not_applicable.axis
             ));
             continue;
@@ -2006,22 +2037,30 @@ fn build_axes(
 
     for (claim, module_path) in claims {
         if claim.id.trim().is_empty() {
-            errors.push(format!("{scope} has an empty claim id"));
+            errors.push(format!(
+                "{scope} has an empty claim id. Write \"A proposition.\" as alias"
+            ));
             continue;
         }
         if claim.text.trim().is_empty() {
-            errors.push(format!("{scope} claim `{}` has empty text", claim.id));
+            errors.push(format!(
+                "{scope} claim `{}` has empty text. Write a falsifiable sentence before `as {}`",
+                claim.id, claim.id
+            ));
             continue;
         }
         if !claim_ids.insert(claim.id.clone()) {
-            errors.push(format!("{scope} has duplicate claim id `{}`", claim.id));
+            errors.push(format!(
+                "{scope} has duplicate claim id `{}`. Give each claim its own alias inside this owner",
+                claim.id
+            ));
             continue;
         }
         let entry = axes.get_mut(&claim.axis).expect("all axes are initialized");
         if entry.status == AxisStatus::NotApplicable {
             errors.push(format!(
-                "{scope} has a {} claim but marks that axis not applicable",
-                claim.axis
+                "{scope} has a {} claim but marks that axis not applicable. Either keep the claim and drop NotApplicable({}), or keep NotApplicable and move the claim off that axis",
+                claim.axis, claim.axis
             ));
             continue;
         }
@@ -2130,7 +2169,7 @@ impl EvidenceContext<'_> {
             }
             _ => {
                 errors.push(format!(
-                    "{} claim `{}` evidence binder `{binder}` is ambiguous; candidates: {}",
+                    "{} claim `{}` evidence binder `{binder}` is ambiguous; candidates: {}. Point the binder at one fully qualified item",
                     self.scope,
                     self.claim_id,
                     candidates.join(", ")
@@ -2312,9 +2351,11 @@ mod tests {
             parse_annotations(&item.attrs, &Arc::<str>::from("src/lib.rs"), 2, &mut errors);
 
         assert!(annotations.is_empty());
-        assert_eq!(
-            errors,
-            ["src/lib.rs:2: specdrs requires arguments"]
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert!(
+            errors[0].starts_with("src/lib.rs:2: specdrs requires arguments"),
+            "{}",
+            errors[0]
         );
     }
 

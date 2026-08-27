@@ -38,12 +38,13 @@ specdrs_module!(in_spans("command-line-interface"));
         parent = "specdrs",
         claims(
             Objectives(
-                Job("Expose map emission, static checks, claim views, and semantic analysis as cargo subcommands." as purpose),
+                Job("Expose map emission, static checks, claim views, semantic analysis, and the authoring guide as cargo subcommands." as purpose),
             ),
             Constraints(
                 Interface(
                     "Each command accepts only its documented positional arguments and options." as command_contract,
                     "Show supports text and JSON projections with caller-selected grouping order." as show_contract,
+                    "how writes the authoring guide to standard output and accepts no arguments." as how_contract,
                 ),
                 Effects(
                     "Emit writes one map file, its selected destination or the default map path whose parent it creates, and analyze contacts only the configured analyzer endpoint." as bounded_effects,
@@ -70,8 +71,13 @@ specdrs_module!(in_spans("command-line-interface"));
                 command_contract(
                     Test = crate::cli::tests::conflicting_emit_destinations_fail,
                     Test = crate::cli::tests::cargo_forwarded_subcommand_name_is_accepted,
+                    Test = crate::cli::tests::how_rejects_arguments,
                 ),
                 show_contract(Test = crate::cli::tests::grouping_order_is_parsed),
+                how_contract(
+                    Test = crate::cli::tests::how_prints_the_authoring_guide,
+                    Test = crate::cli::tests::how_rejects_arguments,
+                ),
                 failure_exit(Test = crate::cli::tests::run_cli_returns_failure_for_invalid_command),
             ),
         )
@@ -117,6 +123,7 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
         "check" => Args::parse(&args[1..])?.check(),
         "show" => Args::parse(&args[1..])?.show(),
         "analyze" => Args::parse(&args[1..])?.analyze(),
+        "how" => print_how(&args[1..]),
         "help" | "--help" | "-h" => {
             print_help();
             Ok(())
@@ -743,11 +750,29 @@ fn print_analysis(report: &AnalysisReport) {
     }
 }
 
+/// Prints the authoring guide.
+///
+/// # Errors
+///
+/// Returns an error when any argument is supplied.
+const AUTHORING_GUIDE: &str = include_str!("how.txt");
+
+fn print_how(args: &[String]) -> Result<(), String> {
+    if let Some(argument) = args.first() {
+        return Err(format!(
+            "how accepts no arguments\n\nunexpected argument `{argument}`"
+        ));
+    }
+    print!("{AUTHORING_GUIDE}");
+    Ok(())
+}
+
 /// Prints command usage and option help.
 fn print_help() {
     println!(
         "specdrs knowledge maps\n\n\
-Usage:\n  cargo specdrs emit [--stdout | --output <path>] [OPTIONS]\n  \
+Usage:\n  cargo specdrs how\n  \
+cargo specdrs emit [--stdout | --output <path>] [OPTIONS]\n  \
 cargo specdrs check [OPTIONS]\n  \
 cargo specdrs show <span-or-item> [--group-by kind,axis,owner] [--json] [OPTIONS]\n  \
 cargo specdrs analyze [--span <id>]... [--item <path>]... [--jobs <count>] [--json] [OPTIONS]\n\n\
@@ -764,6 +789,26 @@ mod tests {
     #[test]
     fn cargo_forwarded_subcommand_name_is_accepted() {
         run(vec!["specdrs".into(), "--version".into()]).unwrap();
+    }
+
+    #[test]
+    fn how_prints_the_authoring_guide() {
+        run(vec!["how".into()]).unwrap();
+        assert!(AUTHORING_GUIDE.starts_with("specdrs authoring guide"));
+        assert!(AUTHORING_GUIDE.contains("#[specdrs]"));
+        assert!(AUTHORING_GUIDE.contains("specdrs_span!"));
+        assert!(AUTHORING_GUIDE.contains("specdrs_module!"));
+        assert!(AUTHORING_GUIDE.contains("Objectives"));
+        assert!(AUTHORING_GUIDE.contains("in_spans"));
+        assert!(AUTHORING_GUIDE.contains("read the diagnostic"));
+        assert!(!AUTHORING_GUIDE.contains("what the scanner enforces"));
+    }
+
+    #[test]
+    fn how_rejects_arguments() {
+        let error = run(vec!["how".into(), "checkout".into()]).unwrap_err();
+        assert!(error.contains("no arguments"));
+        assert!(error.contains("checkout"));
     }
 
     #[test]

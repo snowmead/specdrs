@@ -265,11 +265,16 @@ The source range covers the complete Rust item. An agent can use the JSON as a m
 ## commands
 
 ```text
+cargo specdrs how
 cargo specdrs emit [--stdout | --output <path>] [--manifest-path <path>] [-p <package>]
 cargo specdrs check [--manifest-path <path>] [-p <package>]
 cargo specdrs show <span-or-item> [--group-by kind,axis,owner] [--json] [--manifest-path <path>] [-p <package>]
 cargo specdrs analyze [--span <id>]... [--item <path>]... [--jobs <count>] [--json] [--manifest-path <path>] [-p <package>]
 ```
+
+`how` prints the authoring guide: when to use each macro and how to compose spans
+and claims. Parser and map-builder failures name the broken rule and the pattern
+to write instead. `how` accepts no arguments.
 
 `emit` with neither `--stdout` nor `--output` writes
 `<package>/target/specdrs/<crate>.json`, creating that directory if needed.
@@ -337,7 +342,7 @@ Rust source
   -> pass, fail, indeterminate, or execution error report
 ```
 
-The analyzer does not run during `emit`, `check`, or `show`. Only `cargo specdrs analyze` contacts Ollama.
+The analyzer does not run during `how`, `emit`, `check`, or `show`. Only `cargo specdrs analyze` contacts Ollama.
 
 ## dogfood map
 

@@ -1,6 +1,16 @@
 use std::collections::BTreeSet;
 
-use specdrs_syntax::{ClaimArgs, ClaimsArgs, Directive, SpecdrsArgs, SpanArgs};
+use specdrs_syntax::{
+    ClaimArgs,
+    ClaimsArgs,
+    Directive,
+    SpecdrsArgs,
+    SpanArgs,
+    impl_cannot_own_claims,
+    specdrs_module_requires_in_spans,
+    specdrs_requires_arguments,
+    specdrs_span_requires_entry, //
+};
 use proc_macro::TokenStream;
 use proc_macro2::{Span, TokenStream as TokenStream2};
 use quote::quote;
@@ -59,7 +69,7 @@ fn validate_span_declaration(input: TokenStream2) -> syn::Result<TokenStream2> {
     if span.entry.is_none() {
         return Err(syn::Error::new(
             Span::call_site(),
-            "specdrs_span! requires `entry`",
+            specdrs_span_requires_entry(),
         ));
     }
     Ok(TokenStream2::new())
@@ -75,7 +85,7 @@ fn validate_module_memberships(input: TokenStream2) -> syn::Result<TokenStream2>
     {
         return Err(syn::Error::new(
             Span::call_site(),
-            "specdrs_module! requires one or more in_spans directives",
+            specdrs_module_requires_in_spans(),
         ));
     }
     Ok(TokenStream2::new())
@@ -101,10 +111,7 @@ fn expand(attribute: TokenStream2, item: TokenStream2) -> syn::Result<TokenStrea
             .flat_map(|annotation| &annotation.directives)
             .any(|directive| matches!(directive, Directive::Claims(_)))
     {
-        return Err(syn::Error::new(
-            Span::call_site(),
-            "an impl block cannot own claims; declare `span(...)` on the impl block, or move `claims(...)` to the implemented type or one method",
-        ));
+        return Err(syn::Error::new(Span::call_site(), impl_cannot_own_claims()));
     }
 
     let Some(documentation) = render_documentation(&annotations, is_impl) else {
@@ -139,7 +146,7 @@ fn parse_attribute(attribute: &Attribute) -> syn::Result<SpecdrsArgs> {
     let Meta::List(list) = &attribute.meta else {
         return Err(syn::Error::new_spanned(
             attribute,
-            "specdrs requires arguments",
+            specdrs_requires_arguments(),
         ));
     };
     syn::parse2(list.tokens.clone())

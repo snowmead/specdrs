@@ -327,11 +327,9 @@ mod tests {
         )
         .err()
         .expect("schema one syntax should fail");
-        assert!(
-            error
-                .to_string()
-                .contains("unknown specdrs directive")
-        );
+        let message = error.to_string();
+        assert!(message.contains("unknown specdrs directive"), "{message}");
+        assert!(message.contains("in_spans(...)"), "{message}");
     }
 
     #[test]

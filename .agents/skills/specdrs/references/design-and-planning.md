@@ -2,7 +2,7 @@
 
 Use this workflow to turn an idea into decisions, record those decisions as
 engineering claims, plan the code changes, and check the implementation against
-the claims.
+the claims. Load what the crate already declared before asking anything new.
 
 ## Split the work by semantic scope
 
@@ -60,10 +60,44 @@ Do not restate a Rust signature, ownership rule, or `Result` type as prose.
 Mark an axis not applicable only with a concrete reason. Leave an unexamined
 axis unspecified.
 
+## Load existing claims first
+
+Do not grill, plan, or implement from a blank page when the crate already has
+specdrs annotations. Those annotations are the current design record.
+
+The CLI is the composed view. File reads are the implementation. Use both, in
+that order. Hover and grep are not the composed contract: they miss parent-span
+claims, `specdrs_span!` declarations in other files, and members enrolled by
+`specdrs_module!` or a container.
+
+1. Run `cargo specdrs emit --stdout` (or read the default map under
+   `target/specdrs/`) to list spans, parents, entries, members, and which items
+   already own claims. Do not paste the whole map into the conversation.
+2. For each span or item in the work's scope, run
+   `cargo specdrs show <span-or-item>`. That output is the obligation set:
+   inherited parent-span claims plus local claims, ancestor-first.
+3. Run `cargo specdrs check` for claims without evidence and unspecified axes
+   on owners that already engaged.
+4. Open the `source` file and line range `show` or `emit` printed, and read
+   that body. That is the secondary tool. Do not reread the crate to rediscover
+   memberships the map already computed.
+
+Seed the working design record from that output. Existing claims are accepted
+decisions until the human amends them. Do not re-ask an axis that already has a
+claim. Do not propose a new claim that conflicts with one still in the source.
+Name conflicts the same way as later in this file.
+
+If emit fails because nothing is annotated yet, there is no prior specdrs
+record. Grill from the code. If emit or check fails with a diagnostic, follow
+it. Do not invent a workaround that disagrees with the map.
+
+After writing or changing an annotation, `show` that owner again before treating
+the composed view as current.
+
 ## Grill in decision rounds
 
-Inspect code and documentation to settle facts. Ask the human for decisions,
-not facts the repository already contains.
+Ask the human for decisions, not facts the repository already contains, and not
+axes the map already specifies.
 
 Build a dependency graph of open decisions. The frontier is every open decision
 whose prerequisites are settled. Ask the complete frontier in one numbered
@@ -122,10 +156,12 @@ conflicts: none
 experiments: none
 ```
 
-Update this record after every round. Use its accepted state as the input to
-planning. Write it to a separate file only when the user asks for a persisted
-design artifact. During implementation, run `cargo specdrs how` and follow its
-instructions to record the accepted claims beside the Rust items they govern.
+Update this record after every round. Keep loaded specdrs claims in it unless
+the human amended them. Use its accepted state as the input to planning. Write
+it to a separate file only when the user asks for a persisted design artifact.
+During implementation, run `cargo specdrs how` and follow its instructions to
+record the accepted claims beside the Rust items they govern. Then `show` the
+owner.
 
 A **conflict** is two claims that cannot both hold as written. Name both claim
 aliases and the implementation mechanism that makes them conflict. Recommend a
@@ -144,6 +180,8 @@ Split the span when the session keeps growing without closing branches.
 
 The design is ready when:
 
+- in-scope claims were loaded from the map and either kept, amended, or named
+  as conflicts;
 - every hot branch has been visited;
 - every accepted claim has an owner, alias, kind, axis, and one proposition;
 - every conflict is resolved or recorded as unresolved;
@@ -155,6 +193,7 @@ asks for a plan. Move to implementation when the user asks to build it.
 
 ## Plan from the accepted claims
 
+Start from the loaded specdrs record plus claims accepted in this session.
 Write the implementation plan around claims, not files alone. For each plan
 step, name:
 
@@ -179,6 +218,7 @@ Before writing specdrs macros or running any specdrs command, run:
 cargo specdrs how
 ```
 
-Treat its output as the source of truth for macro syntax, command usage, map
-contents, validation, and analysis. Do not duplicate those instructions in this
-reference. Run it again when the installed CLI changes.
+Treat its output as the source of truth for how to author spans and claims.
+If `cargo check` or `cargo specdrs check` fails, follow the diagnostic; it names
+the failure and the pattern to write. Do not duplicate those instructions here.
+Run `how` again when the installed CLI changes.

@@ -36,6 +36,23 @@ fn emit_and_show_work_for_a_consumer_crate() {
 }
 
 #[test]
+fn how_prints_the_authoring_guide() {
+    let output = Command::new(env!("CARGO_BIN_EXE_specdrs"))
+        .arg("how")
+        .output()
+        .expect("how should run");
+    assert!(output.status.success());
+    let text = String::from_utf8(output.stdout).unwrap();
+    assert!(text.starts_with("specdrs authoring guide"));
+    assert!(text.contains("#[specdrs]"));
+    assert!(text.contains("specdrs_span!"));
+    assert!(text.contains("specdrs_module!"));
+    assert!(text.contains("Objectives"));
+    assert!(text.contains("in_spans"));
+    assert!(!text.starts_with('{'));
+}
+
+#[test]
 fn command_help_does_not_execute_the_command() {
     let output = Command::new(env!("CARGO_BIN_EXE_cargo-specdrs"))
         .args(["emit", "--help"])

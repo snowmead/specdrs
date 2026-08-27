@@ -6,6 +6,9 @@ use quote::ToTokens;
 use syn::parse::{Parse, ParseStream};
 use syn::{Ident, LitStr, Result, Token, TypePath, parenthesized};
 
+mod diagnostics;
+pub use diagnostics::*;
+
 #[derive(Debug, Clone)]
 pub struct SpecdrsArgs {
     pub directives: Vec<Directive>,
@@ -99,7 +102,7 @@ impl FromStr for Axis {
         Self::ALL
             .into_iter()
             .find(|axis| axis.to_string() == value)
-            .ok_or_else(|| format!("unknown axis `{value}`"))
+            .ok_or_else(|| unknown_axis(value))
     }
 }
 
@@ -150,10 +153,7 @@ impl Parse for SpecdrsArgs {
                 "in_spans" => directives.push(Directive::InSpans(parse_span_ids(&content)?)),
                 "claims" => directives.push(Directive::Claims(content.parse()?)),
                 _ => {
-                    return Err(syn::Error::new(
-                        name.span(),
-                        "unknown specdrs directive",
-                    ));
+                    return Err(syn::Error::new(name.span(), unknown_directive()));
                 }
             }
             parse_comma(input)?;
@@ -187,15 +187,15 @@ impl Parse for SpanArgs {
                     claims = Some(content.parse()?);
                 }
                 "id" | "parent" | "entry" | "claims" => {
-                    return Err(syn::Error::new(name.span(), "duplicate span field"));
+                    return Err(syn::Error::new(name.span(), duplicate_span_field()));
                 }
-                _ => return Err(syn::Error::new(name.span(), "unknown span field")),
+                _ => return Err(syn::Error::new(name.span(), unknown_span_field())),
             }
             parse_comma(input)?;
         }
 
         Ok(Self {
-            id: id.ok_or_else(|| input.error("span requires `id`"))?,
+            id: id.ok_or_else(|| input.error(span_requires_id()))?,
             parent,
             entry,
             claims,
@@ -241,22 +241,20 @@ impl Parse for ClaimsArgs {
                     stage = 4;
                     evidence = parse_evidence_group(&content)?;
                 }
-                _ => return Err(syn::Error::new(name.span(), "unknown claims group")),
+                _ => return Err(syn::Error::new(name.span(), unknown_claims_group())),
             }
             parse_comma(input)?;
         }
 
         let aliases: BTreeSet<_> = raw_claims.iter().map(|claim| claim.id.as_str()).collect();
         if aliases.len() != raw_claims.len() {
-            return Err(input.error("claim aliases must be unique within one owner"));
+            return Err(input.error(unique_claim_aliases()));
         }
         if let Some(unknown) = evidence
             .keys()
             .find(|alias| !aliases.contains(alias.as_str()))
         {
-            return Err(input.error(format!(
-                "evidence references unknown claim alias `{unknown}`"
-            )));
+            return Err(input.error(unknown_evidence_alias(unknown)));
         }
 
         let claims = raw_claims
@@ -284,13 +282,10 @@ fn require_group(
     group_stage: u8,
 ) -> Result<()> {
     if group_stage < current_stage {
-        return Err(syn::Error::new(
-            name.span(),
-            "claims groups must be ordered as Objectives, Constraints, Assumptions, NotApplicable, evidence",
-        ));
+        return Err(syn::Error::new(name.span(), claims_group_order()));
     }
     if !seen.insert(group.to_owned()) {
-        return Err(syn::Error::new(name.span(), "duplicate claims group"));
+        return Err(syn::Error::new(name.span(), duplicate_claims_group()));
     }
     Ok(())
 }
@@ -305,13 +300,13 @@ fn parse_kind_group(input: ParseStream<'_>, kind: ClaimKind) -> Result<Vec<RawCl
         if !axes.insert(axis) {
             return Err(syn::Error::new(
                 axis_name.span(),
-                "duplicate axis in claim kind group",
+                duplicate_axis_in_kind_group(),
             ));
         }
         let content;
         parenthesized!(content in input);
         if content.is_empty() {
-            return Err(content.error("claim axis group must not be empty"));
+            return Err(content.error(empty_axis_group()));
         }
         while !content.is_empty() {
             let text: LitStr = content.parse()?;
@@ -328,7 +323,7 @@ fn parse_kind_group(input: ParseStream<'_>, kind: ClaimKind) -> Result<Vec<RawCl
         parse_comma(input)?;
     }
     if claims.is_empty() {
-        return Err(input.error("claim kind group must not be empty"));
+        return Err(input.error(empty_kind_group()));
     }
     Ok(claims)
 }
@@ -343,7 +338,7 @@ fn parse_not_applicable_group(input: ParseStream<'_>) -> Result<Vec<NotApplicabl
         if !axes.insert(axis) {
             return Err(syn::Error::new(
                 axis_name.span(),
-                "duplicate axis in NotApplicable",
+                duplicate_not_applicable_axis(),
             ));
         }
         let reason = parse_string_assignment(input, &axis_name)?;
@@ -351,7 +346,7 @@ fn parse_not_applicable_group(input: ParseStream<'_>) -> Result<Vec<NotApplicabl
         parse_comma(input)?;
     }
     if entries.is_empty() {
-        return Err(input.error("NotApplicable must not be empty"));
+        return Err(input.error(empty_not_applicable()));
     }
     Ok(entries)
 }
@@ -363,26 +358,26 @@ fn parse_evidence_group(input: ParseStream<'_>) -> Result<BTreeMap<String, Vec<E
         let content;
         parenthesized!(content in input);
         if entries.contains_key(&alias.to_string()) {
-            return Err(syn::Error::new(alias.span(), "duplicate evidence alias"));
+            return Err(syn::Error::new(alias.span(), duplicate_evidence_alias()));
         }
         let mut links = Vec::new();
         let mut unique = BTreeSet::new();
         while !content.is_empty() {
             let link = parse_evidence(&content)?;
             if !unique.insert((link.kind, link.binder.clone())) {
-                return Err(content.error("duplicate evidence link"));
+                return Err(content.error(duplicate_evidence_link()));
             }
             links.push(link);
             parse_comma(&content)?;
         }
         if links.is_empty() {
-            return Err(content.error("evidence alias must contain at least one link"));
+            return Err(content.error(empty_evidence_alias()));
         }
         entries.insert(alias.to_string(), links);
         parse_comma(input)?;
     }
     if entries.is_empty() {
-        return Err(input.error("evidence must not be empty"));
+        return Err(input.error(empty_evidence_group()));
     }
     Ok(entries)
 }
@@ -395,7 +390,7 @@ fn parse_evidence(input: ParseStream<'_>) -> Result<EvidenceArgs> {
         "Fuzz" => EvidenceKind::Fuzz,
         "Proof" => EvidenceKind::Proof,
         "Lint" => EvidenceKind::Lint,
-        _ => return Err(syn::Error::new(value.span(), "unknown evidence kind")),
+        _ => return Err(syn::Error::new(value.span(), unknown_evidence_kind())),
     };
     input.parse::<Token![=]>()?;
     let binder: TypePath = input.parse()?;
@@ -413,7 +408,7 @@ fn parse_span_ids(input: ParseStream<'_>) -> Result<Vec<String>> {
         parse_comma(input)?;
     }
     if ids.is_empty() {
-        return Err(input.error("in_spans requires at least one span id"));
+        return Err(input.error(empty_in_spans()));
     }
     Ok(ids)
 }
@@ -422,7 +417,7 @@ fn parse_string_assignment(input: ParseStream<'_>, name: &Ident) -> Result<Strin
     input.parse::<Token![=]>()?;
     let value: LitStr = input
         .parse()
-        .map_err(|_| syn::Error::new(name.span(), format!("`{name}` requires a string literal")))?;
+        .map_err(|_| syn::Error::new(name.span(), string_literal_required(&name.to_string())))?;
     Ok(value.value())
 }
 

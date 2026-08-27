@@ -3,7 +3,8 @@
 //! The [`specdrs`] attribute appends local claims and evidence to rustdoc so they appear
 //! in rust-analyzer hovers. [`specdrs_module`] applies memberships to every item in one
 //! module. [`specdrs_span`] declares a span without an attribute host item.
-//! `cargo specdrs show` provides inherited span claims.
+//! `cargo specdrs how` is the authoring guide. `cargo specdrs show` provides inherited
+//! span claims.
 //!
 //! [`specdrs`]: crate::specdrs
 //! [`specdrs_module`]: crate::specdrs_module

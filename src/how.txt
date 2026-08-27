@@ -1,0 +1,175 @@
+specdrs authoring guide
+
+Rust is the program. Annotations declare structure and decisions. The generated
+JSON is disposable output for people, agents, and other tools.
+
+If cargo check or cargo specdrs check fails, read the diagnostic. It names what
+broke and the pattern to write instead. Do not guess at parser rules from this
+guide. If code forces a design change, amend the claim with the human. Do not
+silently make the implementation and the annotation disagree.
+
+Import the macros with `use specdrs::prelude::*;`.
+
+## what to compose
+
+A span is a named semantic cut across Rust items. It has a stable id, one reading
+entry, optional parent, explicit members, and optional claims. Choose the smallest
+span that contains the decision. Split independent jobs before encoding them.
+
+An item is one Rust item identified by its definition path. Item claims apply only
+to that item. Calling a function does not make it a member. Membership is explicit.
+
+A claim is one independently falsifiable proposition: a stable alias, one sentence
+of prose, one kind, and one axis.
+
+Kinds:
+
+- Objective: an end state the implementation must satisfy. No rank. Every
+  objective must hold.
+- Constraint: a condition that must hold. A violation makes the design or the
+  implementation invalid.
+- Assumption: treated as true. If it is false, revisit the design.
+
+Axes. Use only those that expose a real decision. Leave the rest unspecified.
+
+- Job: the change in the world this work must cause, and why
+- Interface: the semantic data contract crossing a boundary
+- Effects: state changed outside the boundary
+- Invariants: what must always, never, or eventually hold
+- Assumptions: facts treated as true outside the boundary
+- State: what is remembered, who owns it, and for how long
+- Time: deadlines, frequency, ordering, and freshness
+- Failure: what breaks, how it is detected, and what happens next
+- Resources: money, compute, storage, or human time, including how compute and
+  memory grow with input size
+- Authority: who may cause each effect
+- Observation: how success and failure are known
+- Change: requirements, data, callers, or deployment order expected to move
+
+Put algorithmic complexity under Resources. Use Time for latency and ordering.
+Use State for what is remembered. Do not restate a Rust signature, ownership
+rule, or Result type as prose. NotApplicable needs a concrete reason.
+
+Span claims describe the cut. Item claims describe that item only. A helper that
+merely participates does not need its own claims. Join it with membership.
+
+## when to use each macro
+
+#[specdrs(...)] attaches to a real Rust item. It can declare a span, join spans,
+and own item claims. rust-analyzer shows the generated ## specdrs section on
+hover.
+
+specdrs_span!(...) declares a span with no host item. Name `entry`. Use this at
+the crate root, or for a cut that no single item should own. No hover.
+
+specdrs_module!(in_spans(...)) enrolls the containing module and every descendant.
+Use this to stop repeating in_spans on every helper. It cannot declare a span or
+own claims. No hover.
+
+Pick the attachment:
+
+- The item is the natural host -> #[specdrs]
+- No item should carry the declaration -> specdrs_span!
+- Stop repeating in_spans on every helper -> specdrs_module!
+
+A dummy `mod docs {}` that only exists to host a span is the wrong default.
+That is what specdrs_span! is for.
+
+## typical patterns
+
+Crate-level or cross-module span:
+
+    specdrs_span!(
+        id = "checkout",
+        entry = crate::checkout::run,
+        claims(
+            Objectives(
+                Job("Complete one commercial checkout." as complete_checkout),
+            ),
+            Constraints(
+                Invariants(
+                    "One idempotency key creates at most one ledger row." as one_ledger_row,
+                ),
+            ),
+            Assumptions(
+                Assumptions(
+                    "The payment provider preserves idempotency keys." as provider_idempotency,
+                ),
+            ),
+            NotApplicable(
+                State = "Checkout retains no process-local state.",
+            ),
+            evidence(
+                one_ledger_row(Test = crate::tests::duplicate_request),
+            ),
+        ),
+    );
+
+Item that joins a span and owns a narrower claim:
+
+    #[specdrs(
+        in_spans("checkout"),
+        claims(
+            Constraints(
+                Failure("A provider timeout is returned as retryable." as timeout_is_retryable),
+            ),
+            evidence(
+                timeout_is_retryable(Test = crate::tests::provider_timeout),
+            ),
+        ),
+    )]
+    fn capture() {}
+
+Module-wide membership, then one host declares the span:
+
+    specdrs_module!(in_spans("command-line-interface"));
+
+    #[specdrs(span(id = "command-line-interface", parent = "specdrs", entry = crate::cli::run_cli))]
+    pub fn run_cli(...) { ... }
+
+Container grouping (every method in the impl is a member):
+
+    #[specdrs(span(id = "gateway", parent = "checkout", entry = self::Gateway::send))]
+    impl Gateway {
+        pub fn send(&self) {}
+        pub fn retry(&self) {}
+    }
+
+Cross-boundary grouping. Do not declare the span on one container and join it
+from another module. Declare a host-free parent, then join that:
+
+    specdrs_span!(id = "payments", entry = crate::checkout::run);
+
+    #[specdrs(span(id = "gateway", parent = "payments", entry = self::Gateway::send))]
+    impl Gateway { ... }
+
+    #[specdrs(in_spans("payments"))]
+    fn other_side() {}
+
+Write claims kind-first, then axis, as in the examples. Evidence kinds are Type,
+Test, Fuzz, Proof, and Lint.
+
+## commands
+
+    cargo specdrs how
+    cargo specdrs emit [--stdout | --output <path>] [--manifest-path <path>] [-p <package>]
+    cargo specdrs check [--manifest-path <path>] [-p <package>]
+    cargo specdrs show <span-or-item> [--group-by kind,axis,owner] [--json] [--manifest-path <path>] [-p <package>]
+    cargo specdrs analyze [--span <id>]... [--item <path>]... [--jobs <count>] [--json] [--manifest-path <path>] [-p <package>]
+
+how prints this guide. It accepts no arguments.
+
+emit writes the schema 2 map. Default path: <package>/target/specdrs/<crate>.json.
+
+check is the static gate. Syntax, structure, references, evidence links. No model.
+A failure names the broken annotation and the pattern to write.
+
+show projects claims, including inherited parent-span claims for item queries.
+Use it when a hover is not enough. Hover only shows locally authored metadata
+on #[specdrs] items.
+
+analyze is the semantic audit against specdrs.toml. Span jobs audit span-owned
+claims against direct members. Item jobs audit item-owned claims and treat
+enclosing-span claims as context: a context claim fails only when the
+implementation actively contradicts it. Attributes declare requirements; they
+do not enforce them. Only analyze contacts the model.
