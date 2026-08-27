@@ -1,0 +1,44 @@
+[workspace]
+members = ["specdrs-macros", "specdrs-syntax"]
+resolver = "3"
+
+[package]
+name = "specdrs"
+version = "0.1.0"
+edition = "2024"
+description = "Compile evidence-linked engineering knowledge maps from Rust items"
+license = "MIT"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "specdrs"
+path = "src/main.rs"
+
+[[bin]]
+name = "cargo-specdrs"
+path = "src/cargo-specdrs.rs"
+
+[[bench]]
+name = "build_map"
+harness = false
+
+[dependencies]
+specdrs-macros = { path = "specdrs-macros" }
+specdrs-syntax = { path = "specdrs-syntax" }
+proc-macro2 = { version = "1", features = ["span-locations"] }
+quote = "1"
+rig = { version = "=0.42.0", default-features = false, features = ["agent", "derive", "rustls"] }
+schemars = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+syn = { version = "2", features = ["full", "parsing"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
+toml = "0.9"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = "warn"

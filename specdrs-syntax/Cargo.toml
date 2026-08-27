@@ -1,0 +1,16 @@
+[package]
+name = "specdrs-syntax"
+version = "0.1.0"
+edition = "2024"
+description = "Parser for specdrs knowledge-map attributes"
+license = "MIT"
+
+[dependencies]
+quote = "1"
+syn = { version = "2", features = ["parsing"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = "warn"

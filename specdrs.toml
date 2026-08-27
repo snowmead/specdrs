@@ -1,0 +1,7 @@
+[analyze]
+provider = "ollama"
+model = "gemma4:26b"
+base_url = "http://localhost:11434"
+max_concurrency = 1
+timeout_seconds = 300
+max_output_tokens = 8192
