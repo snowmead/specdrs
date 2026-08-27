@@ -1,5 +1,5 @@
 ---
-name: engineer
+name: specdrs
 description: Turn an engineering idea into agreed design claims, an implementation plan, and code that can be checked against those claims. Use when the user explicitly invokes $engineer for design, planning, implementation, or a design audit.
 ---
 
