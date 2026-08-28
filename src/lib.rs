@@ -35,11 +35,6 @@ pub use build::{
     BuildOptions, //
 };
 pub use cli::run_cli;
-pub use specdrs_macros::{
-    specdrs,
-    specdrs_module,
-    specdrs_span, //
-};
 pub use model::{
     Axis,
     AxisEntry,
@@ -59,6 +54,11 @@ pub use projection::{
     ClaimProjection,
     GroupKey,
     ProjectedClaim, //
+};
+pub use specdrs_macros::{
+    specdrs,
+    specdrs_module,
+    specdrs_span, //
 };
 
 specdrs_span!(

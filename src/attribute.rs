@@ -125,9 +125,7 @@ impl Parse for SpecdrsArgs {
         )
     )]
     fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
-        input
-            .parse::<specdrs_syntax::SpecdrsArgs>()
-            .map(Into::into)
+        input.parse::<specdrs_syntax::SpecdrsArgs>().map(Into::into)
     }
 }
 
@@ -145,9 +143,7 @@ impl Parse for SpanArgs {
         )
     )]
     fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
-        input
-            .parse::<specdrs_syntax::SpanArgs>()
-            .map(Into::into)
+        input.parse::<specdrs_syntax::SpanArgs>().map(Into::into)
     }
 }
 

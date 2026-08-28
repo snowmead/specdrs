@@ -1,19 +1,19 @@
 use std::collections::BTreeSet;
 
+use proc_macro::TokenStream;
+use proc_macro2::{Span, TokenStream as TokenStream2};
+use quote::quote;
 use specdrs_syntax::{
     ClaimArgs,
     ClaimsArgs,
     Directive,
-    SpecdrsArgs,
     SpanArgs,
+    SpecdrsArgs,
     impl_cannot_own_claims,
     specdrs_module_requires_in_spans,
     specdrs_requires_arguments,
     specdrs_span_requires_entry, //
 };
-use proc_macro::TokenStream;
-use proc_macro2::{Span, TokenStream as TokenStream2};
-use quote::quote;
 use syn::parse::{ParseStream, Parser};
 use syn::{Attribute, LitStr, Meta};
 
