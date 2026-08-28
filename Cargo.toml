@@ -7,7 +7,7 @@ name = "specdrs"
 version = "0.1.0"
 edition = "2024"
 description = "Compile evidence-linked engineering knowledge maps from Rust items"
-license = "MIT"
+license = "Apache-2.0"
 
 [lib]
 path = "src/lib.rs"

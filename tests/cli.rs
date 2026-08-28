@@ -31,7 +31,7 @@ fn emit_and_show_work_for_a_consumer_crate() {
         .expect("show should run");
     assert!(shown.status.success());
     let text = String::from_utf8(shown.stdout).unwrap();
-    assert!(text.contains("entry: payments::charge"));
+    assert!(text.contains("entrypoint: payments::charge"));
     assert!(text.contains("unspecified:"));
 }
 
@@ -49,7 +49,7 @@ fn how_prints_the_authoring_guide() {
     assert!(text.contains("specdrs_module!"));
     assert!(text.contains("Objectives"));
     assert!(text.contains("in_spans"));
-    assert!(text.contains("makes both its host and resolved entry"));
+    assert!(text.contains("makes both its host and resolved entrypoint"));
     assert!(!text.starts_with('{'));
 }
 

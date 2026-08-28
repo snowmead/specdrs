@@ -1150,20 +1150,20 @@ max_concurrency = 2
     /// Builds a two-span map where only the parent span and one item own claims.
     fn scope_map() -> crate::KnowledgeMap {
         crate::KnowledgeMap {
-            schema: 2,
+            schema: 3,
             crate_name: "sample".into(),
             spans: vec![
                 crate::Span {
                     id: "operation".into(),
                     parent: None,
-                    entry: "sample::work".into(),
+                    entrypoint: "sample::work".into(),
                     members: vec!["sample::work".into()],
                     axes: axes_with_claim("span_claim"),
                 },
                 crate::Span {
                     id: "operation.child".into(),
                     parent: Some("operation".into()),
-                    entry: "sample::child".into(),
+                    entrypoint: "sample::child".into(),
                     members: vec!["sample::child".into()],
                     axes: crate::Axis::empty_map(),
                 },

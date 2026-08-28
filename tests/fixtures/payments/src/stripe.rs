@@ -5,7 +5,7 @@ specdrs_module!(in_spans("checkout"));
 specdrs_span!(
     id = "ledger",
     parent = "checkout",
-    entry = self::capture,
+    entrypoint = self::capture,
     claims(
         Constraints(
             Invariants("Every capture is recorded exactly once." as single_record),
@@ -44,7 +44,7 @@ mod inherited_shapes {
         span(
             id = "gateway",
             parent = "checkout",
-            entry = self::Gateway::send,
+            entrypoint = self::Gateway::send,
             claims(
                 Objectives(
                     Job("Move one authorized capture to the payment provider." as purpose),

@@ -2,7 +2,7 @@ use specdrs::prelude::*;
 
 mod stripe;
 
-#[specdrs(span(id = "audit", entry = crate::charge))]
+#[specdrs(span(id = "audit", entrypoint = crate::charge))]
 mod audit {}
 
 #[specdrs(in_spans("checkout"))]

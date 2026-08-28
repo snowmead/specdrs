@@ -96,7 +96,7 @@ impl FromStr for Axis {
             ),
         ),
         evidence(
-            three_claim_kinds(Test = crate::model::tests::schema_two_serialization_shape),
+            three_claim_kinds(Test = crate::model::tests::schema_three_serialization_shape),
         ),
     )
 )]
@@ -158,7 +158,7 @@ pub struct Evidence {
             ),
         ),
         evidence(
-            claim_has_four_fields(Test = crate::model::tests::schema_two_serialization_shape),
+            claim_has_four_fields(Test = crate::model::tests::schema_three_serialization_shape),
         ),
     )
 )]
@@ -238,7 +238,7 @@ pub struct Span {
     /// Contains the optional parent span identifier.
     pub parent: Option<String>,
     /// Contains the Rust item path where reading starts.
-    pub entry: String,
+    pub entrypoint: String,
     /// Contains Rust item paths assigned directly to the span.
     pub members: Vec<String>,
     /// Contains all semantic axes for the span.
@@ -268,7 +268,7 @@ pub struct Item {
             ),
             Constraints(
                 Interface(
-                    "Schema 2 identifies the crate, spans, and Rust items with stable serialized field names." as schema_two_shape,
+                    "Schema 3 identifies the crate, spans, and Rust items with stable serialized field names." as schema_three_shape,
                     "The serialized claim kind carries no objective rank field." as objectives_are_unranked,
                     "Every emitted item carries a file and one-based line plus zero-based column boundaries." as source_location_shape,
                 ),
@@ -285,10 +285,10 @@ pub struct Item {
                 Resources = "The data model defines no resource budget.",
             ),
             evidence(
-                schema_two_shape(Test = crate::model::tests::schema_two_serialization_shape),
-                source_location_shape(Test = crate::model::tests::schema_two_serialization_shape),
+                schema_three_shape(Test = crate::model::tests::schema_three_serialization_shape),
+                source_location_shape(Test = crate::model::tests::schema_three_serialization_shape),
                 twelve_axes(Test = crate::model::tests::empty_axes_contains_every_axis),
-                objectives_are_unranked(Test = crate::model::tests::schema_two_serialization_shape),
+                objectives_are_unranked(Test = crate::model::tests::schema_three_serialization_shape),
             ),
         )
     ),
@@ -299,7 +299,7 @@ pub struct Item {
             ),
         ),
         evidence(
-            required_root_fields(Test = crate::model::tests::schema_two_serialization_shape),
+            required_root_fields(Test = crate::model::tests::schema_three_serialization_shape),
         ),
     )
 )]
@@ -333,15 +333,15 @@ mod tests {
     }
 
     #[test]
-    fn schema_two_serialization_shape() {
+    fn schema_three_serialization_shape() {
         let map = KnowledgeMap {
-            schema: 2,
+            schema: 3,
             crate_name: "sample".into(),
             spans: Vec::new(),
             items: BTreeMap::new(),
         };
         let json = serde_json::to_value(map).unwrap();
-        assert_eq!(json["schema"], 2);
+        assert_eq!(json["schema"], 3);
         assert_eq!(json["crate"], "sample");
         assert!(json.get("spans").is_some());
         assert!(json.get("items").is_some());

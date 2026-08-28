@@ -63,7 +63,7 @@ pub use specdrs_macros::{
 
 specdrs_span!(
     id = "specdrs",
-    entry = crate::build::BuildOptions::build,
+    entrypoint = crate::build::BuildOptions::build,
     claims(
         Objectives(Job(
             "Keep engineering intent, implementation locations, and evidence navigable from one generated map."
@@ -71,15 +71,15 @@ specdrs_span!(
         ),),
         Constraints(
             Interface(
-                "Rust attributes are the authored source and schema 2 JSON is the generated interchange format."
+                "Rust attributes are the authored source and schema 3 JSON is the generated interchange format."
                     as authored_and_generated_contract,
-                "A span with children names its primary implementation chokepoint as its entry, which may coincide with a child span's entry."
-                    as parent_entry_may_coincide,
-                "Source runs through the scanner, schema and reference validation, the schema 2 map, then either a projection, a static check, or model audits."
+                "A span with children names its primary implementation chokepoint as its entrypoint, which may coincide with a child span's entrypoint."
+                    as parent_entrypoint_may_coincide,
+                "Source runs through the scanner, schema and reference validation, the schema 3 map, then either a projection, a static check, or model audits."
                     as pipeline_order,
             ),
             Invariants(
-                "Every span names one reading entry and lists exactly the Rust items assigned to it."
+                "Every span names one reading entrypoint and lists exactly the Rust items assigned to it."
                     as navigable_subsystems,
                 "Behaviour implemented in the proc-macro and syntax crates cannot appear in this map: the macro crate's own unit tests and the consumer rustdoc test cover it, and the syntax grammar is exercised through the adapter's tests."
                     as unmappable_crate_boundary,
@@ -104,7 +104,7 @@ specdrs_span!(
         evidence(
             authored_and_generated_contract(Test = crate::build::tests::builds_own_knowledge_map),
             navigable_subsystems(Test = crate::build::tests::dogfood_map_covers_every_subsystem),
-            parent_entry_may_coincide(Test = crate::build::tests::builds_own_knowledge_map),
+            parent_entrypoint_may_coincide(Test = crate::build::tests::builds_own_knowledge_map),
             failures_reach_the_caller(
                 Test = crate::cli::tests::run_cli_returns_failure_for_invalid_command
             ),

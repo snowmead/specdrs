@@ -1,0 +1,56 @@
+[tools]
+rust = "1.98.0"
+ollama = "0.33.0"
+prek = "0.4.14"
+
+[tasks.setup]
+description = "Fetch dependencies, build specdrs, and install the pre-push hook"
+run = [
+    "cargo fetch --locked",
+    "cargo build --workspace --all-targets --locked",
+    "prek install -t pre-push -f",
+]
+
+[tasks.specdrs]
+description = "Run the cargo-specdrs binary, for example: mise run specdrs -- check"
+run = 'cargo run --quiet --locked --bin cargo-specdrs -- "$@"'
+
+[tasks.install]
+description = "Install specdrs and cargo-specdrs into Cargo's bin directory"
+run = "cargo install --path . --locked"
+
+[tasks.fmt]
+description = "Check Rust formatting"
+run = "cargo fmt --all -- --check"
+
+[tasks.cargo-check]
+description = "Type-check every workspace target"
+run = "cargo check --workspace --all-targets --locked"
+
+[tasks.clippy]
+description = "Lint every workspace target and feature"
+run = "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings"
+
+[tasks.test]
+description = "Run every workspace test target"
+run = "cargo test --workspace --all-targets --locked"
+
+[tasks.specdrs-check]
+description = "Validate this repository's specdrs map"
+run = "cargo run --quiet --locked --bin cargo-specdrs -- check"
+
+[tasks.check]
+description = "Run the same checks as the pre-push hook"
+depends = ["fmt", "cargo-check", "clippy", "test", "specdrs-check"]
+
+[tasks.ollama-serve]
+description = "Start the Ollama server required by semantic analysis"
+run = "ollama serve"
+
+[tasks.ollama-pull]
+description = "Download the model configured in specdrs.toml"
+run = "ollama pull gemma4:26b"
+
+[tasks.analyze]
+description = "Run semantic analysis; requires ollama-serve and ollama-pull first"
+run = 'cargo run --quiet --locked --bin cargo-specdrs -- analyze "$@"'

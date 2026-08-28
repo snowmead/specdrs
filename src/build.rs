@@ -32,7 +32,7 @@ use specdrs_syntax::{
     impl_cannot_own_claims,
     specdrs_module_requires_in_spans,
     specdrs_requires_arguments,
-    specdrs_span_requires_entry, //
+    specdrs_span_requires_entrypoint, //
 };
 
 use crate::attribute::{
@@ -388,13 +388,13 @@ struct ScannedSource {
 /// Contains one span declared by a [`specdrs_span!`] invocation.
 ///
 /// The invocation has no host item, so it carries the module path of its own
-/// scope and names its entry explicitly.
+/// scope and names its entrypoint explicitly.
 ///
 /// [`specdrs_span!`]: crate::specdrs_span
 struct ScannedSpan {
     id: String,
     parent: Option<String>,
-    entry: String,
+    entrypoint: String,
     claims: Option<ClaimsArgs>,
     module_path: Vec<String>,
     /// Names the container that declared this span, when one did.
@@ -731,12 +731,12 @@ impl FileScan {
                 "A span declared or joined on a container applies to every item inside that container." as container_distribution,
             ),
             Failure(
-                "A span declared on an impl block without `entry`, and a claims block on an impl block, each add a file-and-line diagnostic." as impl_declaration_diagnostics,
+                "A span declared on an impl block without `entrypoint`, and a claims block on an impl block, each add a file-and-line diagnostic." as impl_declaration_diagnostics,
             ),
         ),
         evidence(
             container_distribution(Test = crate::build::tests::containers_distribute_declared_and_joined_spans),
-            impl_declaration_diagnostics(Test = crate::build::tests::impl_declarations_reject_missing_entry_and_claims),
+            impl_declaration_diagnostics(Test = crate::build::tests::impl_declarations_reject_missing_entrypoint_and_claims),
         ),
     )
     )]
@@ -919,9 +919,9 @@ impl FileScan {
                     match directive {
                         Directive::InSpans(ids) => impl_spans.extend(ids.iter().cloned()),
                         Directive::Span(declaration) => {
-                            let Some(entry) = declaration.entry.clone() else {
+                            let Some(entrypoint) = declaration.entrypoint.clone() else {
                                 self.errors.push(format!(
-                                    "{display_file}:{line}: span `{}` declared on an impl block requires `entry`; an impl block has no def path to default to. Write span(id = \"{}\", entry = self::Type::method)",
+                                    "{display_file}:{line}: span `{}` declared on an impl block requires `entrypoint`; an impl block has no def path to default to. Write span(id = \"{}\", entrypoint = self::Type::method)",
                                     declaration.id, declaration.id
                                 ));
                                 continue;
@@ -931,7 +931,7 @@ impl FileScan {
                             self.span_declarations.push(ScannedSpan {
                                 id: declaration.id.clone(),
                                 parent: declaration.parent.clone(),
-                                entry,
+                                entrypoint,
                                 claims: declaration.claims.clone(),
                                 module_path: module_path.to_vec(),
                                 container: Some(format!("{display_file}:{line}")),
@@ -1120,7 +1120,7 @@ fn distributed_spans(annotations: &[SpecdrsArgs]) -> BTreeSet<String> {
                 "A host-free declaration groups members that no single container encloses, which is the shape a cross-boundary grouping takes." as cross_boundary_grouping,
             ),
             Failure(
-                "A declaration with invalid syntax or no entry adds a file-and-line diagnostic and contributes no span." as span_macro_diagnostic,
+                "A declaration with invalid syntax or no entrypoint adds a file-and-line diagnostic and contributes no span." as span_macro_diagnostic,
             ),
             Invariants(
                 "A macro declaration contributes no Rust item of its own, so nothing synthetic enters the item index." as no_synthetic_item,
@@ -1128,7 +1128,7 @@ fn distributed_spans(annotations: &[SpecdrsArgs]) -> BTreeSet<String> {
         ),
         evidence(
             free_span_module_path(Test = crate::build::tests::span_macro_carries_its_module_path),
-            span_macro_diagnostic(Test = crate::build::tests::span_macro_requires_an_entry),
+            span_macro_diagnostic(Test = crate::build::tests::span_macro_requires_an_entrypoint),
         ),
     )
 )]
@@ -1165,14 +1165,17 @@ fn module_span_declarations(
                 continue;
             }
         };
-        let Some(entry) = span.entry else {
-            errors.push(format!("{file}:{line}: {}", specdrs_span_requires_entry()));
+        let Some(entrypoint) = span.entrypoint else {
+            errors.push(format!(
+                "{file}:{line}: {}",
+                specdrs_span_requires_entrypoint()
+            ));
             continue;
         };
         declarations.push(ScannedSpan {
             id: span.id,
             parent: span.parent,
-            entry,
+            entrypoint,
             claims: span.claims,
             module_path: module_path.to_vec(),
             container: None,
@@ -1460,7 +1463,7 @@ struct SpanDraft {
 /// Contains one parsed span declaration and its claim context.
 struct SpanDeclaration {
     parent: Option<String>,
-    entry: String,
+    entrypoint: String,
     claims: Option<(ClaimsArgs, Vec<String>)>,
     /// Locates the container that declared this span, when one did.
     container: Option<String>,
@@ -1512,14 +1515,14 @@ impl MapAssembler {
         parent = "knowledge-map-build",
         claims(
             Objectives(
-                Job("Assemble scanned directives into a validated schema 2 knowledge map." as purpose),
+                Job("Assemble scanned directives into a validated schema 3 knowledge map." as purpose),
             ),
             Constraints(
                 Interface(
                     "Every emitted item is keyed by its def path and carries its signature, the span memberships it holds directly or by container and module inheritance, all twelve axes, and its complete source range." as emitted_item_contract,
                 ),
                 Invariants(
-                    "Each span has one declaration, one resolvable entry, existing parents, and an acyclic parent chain." as valid_span_graph,
+                    "Each span has one declaration, one resolvable entrypoint, existing parents, and an acyclic parent chain." as valid_span_graph,
                     "Each item owns at most one claims block and every output axis has an explicit status." as valid_item_claims,
                     "Map collections and diagnostics use deterministic ordering." as deterministic_assembly,
                 ),
@@ -1543,7 +1546,7 @@ impl MapAssembler {
         Constraints(
             Interface(
                 "Every scanned Rust item is emitted, so the item index records what the crate contains and span membership is recorded per item rather than gating publication." as complete_item_index,
-                "A span declaration without an explicit entry takes the def path of the item hosting it." as host_entry_default,
+                "A span declaration without an explicit entrypoint takes the def path of the item hosting it." as host_entrypoint_default,
             ),
             Invariants(
                 "Span-owned and item-owned claims remain in distinct axis maps during assembly." as preserves_claim_scope,
@@ -1553,7 +1556,7 @@ impl MapAssembler {
         ),
         evidence(
             complete_item_index(Test = crate::build::tests::builds_own_knowledge_map),
-            host_entry_default(Test = crate::build::tests::builds_own_knowledge_map),
+            host_entrypoint_default(Test = crate::build::tests::builds_own_knowledge_map),
             evidence_binders_resolve(Test = crate::build::tests::builds_own_knowledge_map),
         ),
     )
@@ -1584,11 +1587,13 @@ impl MapAssembler {
                 for directive in &annotation.directives {
                     match directive {
                         Directive::Span(value) => {
-                            let normalized = value.entry.as_deref().map_or_else(
+                            let normalized = value.entrypoint.as_deref().map_or_else(
                                 || def_path.clone(),
-                                |entry| normalize_binder(entry, &source.module_path, &crate_name),
+                                |entrypoint| {
+                                    normalize_binder(entrypoint, &source.module_path, &crate_name)
+                                },
                             );
-                            let entry = resolve_item_reference(
+                            let entrypoint = resolve_item_reference(
                                 &normalized,
                                 &scanned,
                                 &aliases,
@@ -1599,7 +1604,7 @@ impl MapAssembler {
                                 &value.id,
                                 SpanDeclaration {
                                     parent: value.parent.clone(),
-                                    entry,
+                                    entrypoint,
                                     claims: value
                                         .claims
                                         .clone()
@@ -1628,9 +1633,12 @@ impl MapAssembler {
         }
 
         for declaration in span_declarations {
-            let normalized =
-                normalize_binder(&declaration.entry, &declaration.module_path, &crate_name);
-            let entry = resolve_item_reference(
+            let normalized = normalize_binder(
+                &declaration.entrypoint,
+                &declaration.module_path,
+                &crate_name,
+            );
+            let entrypoint = resolve_item_reference(
                 &normalized,
                 &scanned,
                 &aliases,
@@ -1641,7 +1649,7 @@ impl MapAssembler {
                 &declaration.id,
                 SpanDeclaration {
                     parent: declaration.parent,
-                    entry,
+                    entrypoint,
                     claims: declaration
                         .claims
                         .map(|claims| (claims, declaration.module_path)),
@@ -1687,7 +1695,7 @@ impl MapAssembler {
             span_models.push(Span {
                 id,
                 parent: declaration.parent,
-                entry: declaration.entry,
+                entrypoint: declaration.entrypoint,
                 members: draft.members.into_iter().collect(),
                 axes,
             });
@@ -1729,7 +1737,7 @@ impl MapAssembler {
 
         if errors.is_empty() {
             Ok(KnowledgeMap {
-                schema: 2,
+                schema: 3,
                 crate_name,
                 spans: span_models,
                 items: item_models,
@@ -1758,7 +1766,7 @@ fn split_claims(
     )
 }
 
-/// Resolves a span entry against canonical item paths and aliases.
+/// Resolves a span entrypoint against canonical item paths and aliases.
 #[specdrs(in_spans("knowledge-map-build.map-assembly"))]
 fn resolve_item_reference(
     path: &str,
@@ -1774,14 +1782,14 @@ fn resolve_item_reference(
         Some([candidate]) => candidate.clone(),
         Some(candidates) => {
             errors.push(format!(
-                "span `{span_id}` entry `{path}` is ambiguous; candidates: {}. Point entry at one fully qualified item path",
+                "span `{span_id}` entrypoint `{path}` is ambiguous; candidates: {}. Point entrypoint at one fully qualified item path",
                 candidates.join(", ")
             ));
             path.to_owned()
         }
         _ => {
             errors.push(format!(
-                "span `{span_id}` has missing entry `{path}`. entry must name a scanned Rust item: a function, type, trait, module, const, static, or impl method. Point it at an existing item, or add that item"
+                "span `{span_id}` has missing entrypoint `{path}`. entrypoint must name a scanned Rust item: a function, type, trait, module, const, static, or impl method. Point it at an existing item, or add that item"
             ));
             path.to_owned()
         }
@@ -1793,13 +1801,13 @@ fn resolve_item_reference(
     claims(
         Constraints(
             Invariants(
-                "A resolved entry that names a scanned item becomes a member of the span and gains the span membership." as entry_is_member,
-                "An attribute-declared span adds its addressable host as a direct member, including when its entry names another item." as attribute_host_is_member,
+                "A resolved entrypoint that names a scanned item becomes a member of the span and gains the span membership." as entrypoint_is_member,
+                "An attribute-declared span adds its addressable host as a direct member, including when its entrypoint names another item." as attribute_host_is_member,
             ),
         ),
         evidence(
-            entry_is_member(Test = crate::build::tests::builds_own_knowledge_map),
-            attribute_host_is_member(Test = crate::build::tests::attribute_host_and_entry_are_members),
+            entrypoint_is_member(Test = crate::build::tests::builds_own_knowledge_map),
+            attribute_host_is_member(Test = crate::build::tests::attribute_host_and_entrypoint_are_members),
         ),
     )
 )]
@@ -1815,13 +1823,13 @@ fn record_span_declaration(
     item_drafts: &mut BTreeMap<String, ItemDraft>,
     scanned: &BTreeMap<String, ScannedItem>,
 ) {
-    let entry = declaration.entry.clone();
+    let entrypoint = declaration.entrypoint.clone();
     spans
         .entry(id.to_owned())
         .or_default()
         .declarations
         .push(declaration);
-    for member in [Some(entry.as_str()), host].into_iter().flatten() {
+    for member in [Some(entrypoint.as_str()), host].into_iter().flatten() {
         if scanned.contains_key(member) {
             record_span_membership(id, member, spans, item_drafts);
         }
@@ -1886,11 +1894,14 @@ fn validate_container_spans(
             .first()
             .and_then(|declaration| declaration.container.as_deref())
             .unwrap_or("its declaring container");
-        let entry = draft.declarations.first().map(|value| value.entry.as_str());
+        let entrypoint = draft
+            .declarations
+            .first()
+            .map(|value| value.entrypoint.as_str());
         for member in draft
             .members
             .iter()
-            .filter(|member| Some(member.as_str()) != entry && !seeded.contains(*member))
+            .filter(|member| Some(member.as_str()) != entrypoint && !seeded.contains(*member))
         {
             errors.push(format!(
                 "span `{id}` is declared on the container at {container}, but `{member}` joins it from outside. A container-declared span only covers items inside that container. For a cross-boundary grouping, declare the span with specdrs_span! and join it from both sides with in_spans, or give this span a parent and join the parent instead"
@@ -1917,7 +1928,7 @@ fn validate_spans(spans: &BTreeMap<String, SpanDraft>, errors: &mut Vec<String>)
     for (id, span) in spans {
         if id.trim().is_empty() {
             errors.push(
-                "span id must not be empty. Write span(id = \"checkout\", ...) or specdrs_span!(id = \"checkout\", entry = ...)"
+                "span id must not be empty. Write span(id = \"checkout\", ...) or specdrs_span!(id = \"checkout\", entrypoint = ...)"
                     .to_owned(),
             );
         }
@@ -2255,7 +2266,7 @@ mod tests {
             .iter()
             .find(|span| span.id == "knowledge-map-build")
             .expect("build span should exist");
-        assert_eq!(build.entry, "specdrs::build::BuildOptions::build");
+        assert_eq!(build.entrypoint, "specdrs::build::BuildOptions::build");
         assert_eq!(build.parent.as_deref(), Some("specdrs"));
         assert_eq!(
             build.axes[&Axis::Interface].claims[0].evidence[0].result,
@@ -2268,7 +2279,7 @@ mod tests {
             .find(|span| span.id == "knowledge-map-build.item-identity")
             .expect("identity span should exist");
         assert_eq!(identity.parent.as_deref(), Some("knowledge-map-build"));
-        assert_eq!(identity.entry, "specdrs::build::impl_owner_paths");
+        assert_eq!(identity.entrypoint, "specdrs::build::impl_owner_paths");
         assert_eq!(
             identity.axes[&Axis::Invariants].claims[0].evidence[0].result,
             EvidenceResult::Linked
@@ -2276,9 +2287,9 @@ mod tests {
     }
 
     #[test]
-    fn attribute_host_and_entry_are_members() {
+    fn attribute_host_and_entrypoint_are_members() {
         let host = "payments::checkout";
-        let entry = "payments::checkout::run";
+        let entrypoint = "payments::checkout::run";
         let scanned = BTreeMap::from([
             (
                 host.to_owned(),
@@ -2290,7 +2301,7 @@ mod tests {
                 },
             ),
             (
-                entry.to_owned(),
+                entrypoint.to_owned(),
                 ScannedItem {
                     source: None,
                     shape: ItemShape::Function { test: false },
@@ -2306,7 +2317,7 @@ mod tests {
             "checkout",
             SpanDeclaration {
                 parent: None,
-                entry: entry.to_owned(),
+                entrypoint: entrypoint.to_owned(),
                 claims: None,
                 container: None,
             },
@@ -2318,16 +2329,19 @@ mod tests {
 
         assert_eq!(
             spans["checkout"].members,
-            BTreeSet::from([host.to_owned(), entry.to_owned()])
+            BTreeSet::from([host.to_owned(), entrypoint.to_owned()])
         );
         assert_eq!(items[host].spans, BTreeSet::from(["checkout".to_owned()]));
-        assert_eq!(items[entry].spans, BTreeSet::from(["checkout".to_owned()]));
+        assert_eq!(
+            items[entrypoint].spans,
+            BTreeSet::from(["checkout".to_owned()])
+        );
 
         record_span_declaration(
             "same",
             SpanDeclaration {
                 parent: None,
-                entry: host.to_owned(),
+                entrypoint: host.to_owned(),
                 claims: None,
                 container: None,
             },
@@ -2428,7 +2442,7 @@ mod tests {
             r#"
             #[specdrs(
                 in_spans("audit"),
-                span(id = "gateway", entry = self::Gateway::send)
+                span(id = "gateway", entrypoint = self::Gateway::send)
             )]
             impl Gateway {
                 fn send(&self) {}
@@ -2463,7 +2477,7 @@ mod tests {
         assert_eq!(scan.span_declarations.len(), 1);
         let declaration = &scan.span_declarations[0];
         assert_eq!(declaration.id, "gateway");
-        assert_eq!(declaration.entry, "self :: Gateway :: send");
+        assert_eq!(declaration.entrypoint, "self :: Gateway :: send");
         assert_eq!(declaration.module_path, ["payments"]);
         assert!(
             declaration.container.is_some(),
@@ -2480,10 +2494,10 @@ mod tests {
     }
 
     #[test]
-    fn impl_declarations_reject_missing_entry_and_claims() {
+    fn impl_declarations_reject_missing_entrypoint_and_claims() {
         let file = syn::parse_file(
             r#"
-            #[specdrs(span(id = "no-entry"))]
+            #[specdrs(span(id = "no-entrypoint"))]
             impl First {
                 fn a(&self) {}
             }
@@ -2509,12 +2523,12 @@ mod tests {
 
         assert!(
             scan.span_declarations.is_empty(),
-            "a declaration without `entry` contributes no span"
+            "a declaration without `entrypoint` contributes no span"
         );
         assert_eq!(scan.errors.len(), 2, "{:?}", scan.errors);
         assert!(
             scan.errors[0].starts_with(
-                "src/lib.rs:2: span `no-entry` declared on an impl block requires `entry`"
+                "src/lib.rs:2: span `no-entrypoint` declared on an impl block requires `entrypoint`"
             ),
             "{}",
             scan.errors[0]
@@ -2537,7 +2551,7 @@ mod tests {
             SpanDraft {
                 declarations: vec![SpanDeclaration {
                     parent: None,
-                    entry: "payments::Gateway".to_owned(),
+                    entrypoint: "payments::Gateway".to_owned(),
                     claims: None,
                     container: Some("src/lib.rs:2".to_owned()),
                 }],
@@ -2575,11 +2589,11 @@ mod tests {
             specdrs_span!(
                 id = "ledger",
                 parent = "checkout",
-                entry = self::capture,
+                entrypoint = self::capture,
                 claims(Constraints(Invariants("Recorded once." as recorded))),
             );
             mod inner {
-                specdrs_span!(id = "inner", entry = self::work);
+                specdrs_span!(id = "inner", entrypoint = self::work);
                 fn work() {}
             }
             "#,
@@ -2594,7 +2608,7 @@ mod tests {
         assert_eq!(top.len(), 1, "the nested declaration is not a sibling");
         assert_eq!(top[0].id, "ledger");
         assert_eq!(top[0].parent.as_deref(), Some("checkout"));
-        assert_eq!(top[0].entry, "self :: capture");
+        assert_eq!(top[0].entrypoint, "self :: capture");
         assert_eq!(top[0].module_path, ["sample"]);
 
         let mut scan = FileScan::default();
@@ -2616,11 +2630,11 @@ mod tests {
     }
 
     #[test]
-    fn span_macro_requires_an_entry() {
+    fn span_macro_requires_an_entrypoint() {
         let file = syn::parse_file(
             r#"
-            specdrs_span!(id = "no-entry");
-            specdrs_span!(id = "bad-syntax", entry = self::work, nonsense = 1);
+            specdrs_span!(id = "no-entrypoint");
+            specdrs_span!(id = "bad-syntax", entrypoint = self::work, nonsense = 1);
             "#,
         )
         .unwrap();
@@ -2638,7 +2652,7 @@ mod tests {
         );
         assert_eq!(errors.len(), 2);
         assert!(
-            errors[0].contains("src/lib.rs:2: specdrs_span! requires `entry`"),
+            errors[0].contains("src/lib.rs:2: specdrs_span! requires `entrypoint`"),
             "{}",
             errors[0]
         );

@@ -31,7 +31,7 @@ pub(crate) enum Directive {
 pub(crate) struct SpanArgs {
     pub id: String,
     pub parent: Option<String>,
-    pub entry: Option<String>,
+    pub entrypoint: Option<String>,
     pub claims: Option<ClaimsArgs>,
 }
 
@@ -95,7 +95,7 @@ impl Parse for SpecdrsArgs {
                     Effects = "Attribute parsing only constructs in-memory directives.",
                 ),
                 evidence(
-                    directive_set(Test = crate::attribute::tests::parses_schema_two_attribute),
+                    directive_set(Test = crate::attribute::tests::parses_schema_three_attribute),
                     group_order(Test = crate::attribute::tests::rejects_out_of_order_groups),
                     unique_groups(
                         Test = crate::attribute::tests::rejects_duplicate_axis_groups,
@@ -119,7 +119,7 @@ impl Parse for SpecdrsArgs {
                 ),
             ),
             evidence(
-                shared_parser(Test = crate::attribute::tests::parses_schema_two_attribute),
+                shared_parser(Test = crate::attribute::tests::parses_schema_three_attribute),
                 preserves_diagnostic(Test = crate::attribute::tests::rejects_schema_one_directives),
             ),
         )
@@ -170,7 +170,7 @@ impl From<specdrs_syntax::SpanArgs> for SpanArgs {
         Self {
             id: value.id,
             parent: value.parent,
-            entry: value.entry,
+            entrypoint: value.entrypoint,
             claims: value.claims.map(Into::into),
         }
     }
@@ -266,19 +266,19 @@ mod tests {
             r#"
             id = "ledger",
             parent = "checkout",
-            entry = self::capture,
+            entrypoint = self::capture,
             claims(Constraints(Invariants("Every capture is recorded." as recorded))),
             "#,
         )
         .expect("a bare span declaration should parse");
         assert_eq!(span.id, "ledger");
         assert_eq!(span.parent.as_deref(), Some("checkout"));
-        assert_eq!(span.entry.as_deref(), Some("self :: capture"));
+        assert_eq!(span.entrypoint.as_deref(), Some("self :: capture"));
         assert_eq!(span.claims.expect("claims are declared").claims.len(), 1);
     }
 
     #[test]
-    fn parses_schema_two_attribute() {
+    fn parses_schema_three_attribute() {
         let args: SpecdrsArgs = syn::parse_str(
             r#"
             span(
@@ -305,7 +305,7 @@ mod tests {
             claims(Constraints(Interface("Amount uses account currency." as currency))),
             "#,
         )
-        .expect("schema two attribute should parse");
+        .expect("schema three attribute should parse");
 
         assert_eq!(args.directives.len(), 3);
         let Directive::Span(span) = &args.directives[0] else {

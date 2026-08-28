@@ -327,20 +327,20 @@ mod tests {
 
     fn nested_map() -> KnowledgeMap {
         KnowledgeMap {
-            schema: 2,
+            schema: 3,
             crate_name: "sample".into(),
             spans: vec![
                 Span {
                     id: "parent".into(),
                     parent: None,
-                    entry: "sample::work".into(),
+                    entrypoint: "sample::work".into(),
                     members: vec!["sample::work".into()],
                     axes: axes_with_claim("parent_claim"),
                 },
                 Span {
                     id: "child".into(),
                     parent: Some("parent".into()),
-                    entry: "sample::work".into(),
+                    entrypoint: "sample::work".into(),
                     members: vec!["sample::work".into()],
                     axes: axes_with_claim("child_claim"),
                 },

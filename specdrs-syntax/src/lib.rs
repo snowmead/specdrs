@@ -28,7 +28,7 @@ pub enum Directive {
 pub struct SpanArgs {
     pub id: String,
     pub parent: Option<String>,
-    pub entry: Option<String>,
+    pub entrypoint: Option<String>,
     pub claims: Option<ClaimsArgs>,
 }
 
@@ -172,7 +172,7 @@ impl Parse for SpanArgs {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
         let mut id = None;
         let mut parent = None;
-        let mut entry = None;
+        let mut entrypoint = None;
         let mut claims = None;
 
         while !input.is_empty() {
@@ -182,26 +182,26 @@ impl Parse for SpanArgs {
                 "parent" if parent.is_none() => {
                     parent = Some(parse_string_assignment(input, &name)?);
                 }
-                "entry" if entry.is_none() => {
+                "entrypoint" if entrypoint.is_none() => {
                     input.parse::<Token![=]>()?;
                     let path: TypePath = input.parse()?;
-                    entry = Some(path.to_token_stream().to_string());
+                    entrypoint = Some(path.to_token_stream().to_string());
                 }
                 "claims" if claims.is_none() => {
                     let content;
                     parenthesized!(content in input);
                     claims = Some(content.parse()?);
                 }
-                "id" | "parent" | "entry" | "claims" => {
+                "id" | "parent" | "entrypoint" | "claims" => {
                     return Err(syn::Error::new(
                         name.span(),
-                        "duplicate span field. Each of id, parent, entry, and claims may appear once in span(...)",
+                        "duplicate span field. Each of id, parent, entrypoint, and claims may appear once in span(...)",
                     ));
                 }
                 _ => {
                     return Err(syn::Error::new(
                         name.span(),
-                        "unknown span field. Span fields are id, parent, entry, claims. Example: span(id = \"checkout\", parent = \"payments\", entry = crate::checkout::run, claims(...))",
+                        "unknown span field. Span fields are id, parent, entrypoint, claims. Example: span(id = \"checkout\", parent = \"payments\", entrypoint = crate::checkout::run, claims(...))",
                     ));
                 }
             }
@@ -213,7 +213,7 @@ impl Parse for SpanArgs {
                 input.error("span requires `id`. Write span(id = \"checkout\", ...)")
             })?,
             parent,
-            entry,
+            entrypoint,
             claims,
         })
     }

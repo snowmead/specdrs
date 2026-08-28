@@ -6,7 +6,7 @@ Rust remains the program. The generated JSON is disposable output for people, ag
 
 ## model
 
-A span is a named semantic cut across Rust items. It has one reading entry, optional parent, explicit direct members, and optional claims. A Rust item may belong to several spans and may own its own claims.
+A span is a named semantic cut across Rust items. It has one reading entrypoint, optional parent, explicit direct members, and optional claims. A Rust item may belong to several spans and may own its own claims.
 
 A claim has four fields:
 
@@ -29,7 +29,7 @@ Claims are organized by kind first, then axis. Each kind and axis pair appears o
 #[specdrs(
     span(
         id = "checkout",
-        entry = crate::checkout::run,
+        entrypoint = crate::checkout::run,
         claims(
             Objectives(
                 Job(
@@ -66,15 +66,15 @@ pub fn run(request: Request) -> Result<Receipt, Error> {
 ```
 
 An attribute declaration makes its addressable host a direct member. Its resolved
-entry is also a direct member:
+entrypoint is also a direct member:
 
 ```rust
-#[specdrs(span(id = "checkout", entry = crate::checkout::run))]
+#[specdrs(span(id = "checkout", entrypoint = crate::checkout::run))]
 mod checkout {}
 ```
 
-This adds both `checkout` and `checkout::run`. `entry` defaults to the host item's
-def path, so the same item appears only once when no explicit entry is given. Use
+This adds both `checkout` and `checkout::run`. `entrypoint` defaults to the host item's
+def path, so the same item appears only once when no explicit entrypoint is given. Use
 `specdrs_span!` instead of a dummy documentation host when no host should join.
 
 Members and item claims are compact:
@@ -114,7 +114,7 @@ become its members:
     span(
         id = "gateway",
         parent = "checkout",
-        entry = self::Gateway::send,
+        entrypoint = self::Gateway::send,
         claims(
             Constraints(
                 Interface("Every member takes the gateway by shared reference." as shared_reference_members),
@@ -137,8 +137,8 @@ container boundary.
 `in_spans(...)` on a container distributes the same way and composes with the
 declared span, so one method can gather memberships from its block, its module,
 and its own attribute. An `impl` block has no name and no def path, so its
-declaration names `entry` explicitly; a `mod` supplies its own def path, becomes a
-member, and supplies the default entry.
+declaration names `entrypoint` explicitly; a `mod` supplies its own def path, becomes a
+member, and supplies the default entrypoint.
 
 An `impl` block owns no claims. A bare `claims(...)` there is rejected by both the
 proc macro and the scanner, because a claim needs an addressable owner and an impl
@@ -158,7 +158,7 @@ other::b  ──► S   (in_spans)         other::b ──► T   (in_spans)
 ```
 
 An `impl` that seeds no methods contributes no container members because it has no
-def path. Its entry still joins and its span stays open. Use `specdrs_span!` instead
+def path. Its entrypoint still joins and its span stays open. Use `specdrs_span!` instead
 when the empty block would exist only to carry the declaration.
 
 A span can be declared without any host item:
@@ -168,26 +168,26 @@ use specdrs::prelude::*;
 
 specdrs_span!(
     id = "checkout",
-    entry = crate::checkout::run,
+    entrypoint = crate::checkout::run,
     claims( /* same claim grammar as span(...) */ ),
 );
 ```
 
-Use this when no Rust item should carry the declaration. `entry` is required,
+Use this when no Rust item should carry the declaration. `entrypoint` is required,
 because the invocation has no def path to default to; the same rule applies to a
-span declared on an `impl` block. Relative paths in `entry` and in evidence binders
+span declared on an `impl` block. Relative paths in `entrypoint` and in evidence binders
 resolve against the module containing the invocation.
 
-The resolved entry becomes a member of the span exactly as it does for an
+The resolved entrypoint becomes a member of the span exactly as it does for an
 attribute declaration. The invocation has no host and contributes no Rust item, so
 nothing synthetic appears in `items`.
 
 Rules enforced by the parser and map builder:
 
 - One span declaration for each span ID, whether from an attribute or `specdrs_span!`.
-- Every span entry resolves to a scanned Rust item.
-- An attribute-declared span makes its addressable host and resolved entry direct members.
-- A declaration with no host def path names its entry explicitly: `specdrs_span!` and any `impl` block.
+- Every span entrypoint resolves to a scanned Rust item.
+- An attribute-declared span makes its addressable host and resolved entrypoint direct members.
+- A declaration with no host def path names its entrypoint explicitly: `specdrs_span!` and any `impl` block.
 - A span declared on a container applies to every item inside that container.
 - A container that seeded members accepts no member from outside itself.
 - An `impl` block owns no claims.
@@ -228,17 +228,17 @@ Evidence in rustdoc is unresolved source metadata. The cargo command resolves a 
 
 ## JSON map
 
-The emitted map uses schema `2`:
+The emitted map uses schema `3`:
 
 ```json
 {
-  "schema": 2,
+  "schema": 3,
   "crate": "payments",
   "spans": [
     {
       "id": "checkout",
       "parent": null,
-      "entry": "payments::checkout::run",
+      "entrypoint": "payments::checkout::run",
       "members": ["payments::checkout::run"],
       "axes": { "Job": { "status": "Specified", "claims": [] }, "...": "all twelve axes" }
     }
@@ -340,7 +340,7 @@ The pipeline is:
 Rust source
   -> syntax scanner
   -> schema and reference validation
-  -> schema 2 knowledge map with source ranges
+  -> schema 3 knowledge map with source ranges
   -> show projection or static check
   -> Ollama span and item audits
   -> pass, fail, indeterminate, or execution error report

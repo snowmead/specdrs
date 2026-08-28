@@ -8,15 +8,15 @@ the claims. Load what the crate already declared before asking anything new.
 
 A **span** is a stable feature or responsibility, such as `checkout` or
 `checkout.refund`. A span may cross modules. It has a stable ID, one Rust item
-as its reading entry, optional parent, explicit member items, and claims that
+as its reading entrypoint, optional parent, explicit member items, and claims that
 apply to the whole semantic cut.
 
 An **item** is one Rust item identified by its definition path. Item claims
 apply only to that item. Calling a function does not make it a span member.
 Membership is explicit. A span declared with `#[specdrs(span(...))]` makes its
-addressable host and resolved entry direct members. `specdrs_span!` has no host,
-so only its resolved entry joins automatically. An `impl` has no definition
-path; its resolved entry and methods become direct members instead.
+addressable host and resolved entrypoint direct members. `specdrs_span!` has no host,
+so only its resolved entrypoint joins automatically. An `impl` has no definition
+path; its resolved entrypoint and methods become direct members instead.
 
 Choose the smallest span that contains the decision. Split independent jobs
 before grilling them. The human owns that scope choice.
@@ -139,7 +139,7 @@ and experiments beside the affected owner.
 
 ```text
 span:checkout
-  entry: payments::checkout::run
+  entrypoint: payments::checkout::run
   Objectives
     Job
       complete_checkout: Complete one commercial checkout.

@@ -12,15 +12,15 @@ use specdrs_syntax::{
     impl_cannot_own_claims,
     specdrs_module_requires_in_spans,
     specdrs_requires_arguments,
-    specdrs_span_requires_entry, //
+    specdrs_span_requires_entrypoint, //
 };
 use syn::parse::{ParseStream, Parser};
 use syn::{Attribute, LitStr, Meta};
 
 /// Attaches specdrs metadata and generated rustdoc to a Rust item.
 ///
-/// Declaring a span makes an addressable host item and the resolved span entry
-/// direct members. An `impl` block has no item identity, so its resolved entry
+/// Declaring a span makes an addressable host item and the resolved span entrypoint
+/// direct members. An `impl` block has no item identity, so its resolved entrypoint
 /// and methods join instead.
 ///
 /// Invalid attribute syntax fails compilation:
@@ -50,12 +50,12 @@ pub fn specdrs_module(input: TokenStream) -> TokenStream {
 
 /// Declares one semantic span without an attribute host item.
 ///
-/// The declaration requires `entry`, because no host item can supply a default
+/// The declaration requires `entrypoint`, because no host item can supply a default
 /// def path. The source scanner consumes this declaration. The macro emits no
-/// Rust item, so the resolved entry is its only automatic member and the span's
+/// Rust item, so the resolved entrypoint is its only automatic member and the span's
 /// claims do not appear in any rustdoc hover.
 ///
-/// A declaration without `entry` fails compilation:
+/// A declaration without `entrypoint` fails compilation:
 ///
 /// ```compile_fail
 /// use specdrs_macros::specdrs_span;
@@ -71,10 +71,10 @@ pub fn specdrs_span(input: TokenStream) -> TokenStream {
 
 fn validate_span_declaration(input: TokenStream2) -> syn::Result<TokenStream2> {
     let span: SpanArgs = syn::parse2(input)?;
-    if span.entry.is_none() {
+    if span.entrypoint.is_none() {
         return Err(syn::Error::new(
             Span::call_site(),
-            specdrs_span_requires_entry(),
+            specdrs_span_requires_entrypoint(),
         ));
     }
     Ok(TokenStream2::new())
@@ -409,7 +409,7 @@ mod tests {
     #[test]
     fn impl_hosts_declare_spans_and_reject_claims() {
         let expanded = expand(
-            quote! { span(id = "gateway", entry = self::Gateway::send) },
+            quote! { span(id = "gateway", entrypoint = self::Gateway::send) },
             quote! { impl Gateway { pub fn send(&self) {} } },
         )
         .expect("an impl host should expand");
@@ -441,21 +441,21 @@ mod tests {
     }
 
     #[test]
-    fn span_declarations_require_an_entry() {
+    fn span_declarations_require_an_entrypoint() {
         assert!(
             validate_span_declaration(quote! {
                 id = "checkout",
                 parent = "payments",
-                entry = crate::checkout::run,
+                entrypoint = crate::checkout::run,
                 claims(Constraints(Job("Charge once." as charge_once)))
             })
             .is_ok()
         );
         let error = validate_span_declaration(quote! { id = "checkout" })
-            .expect_err("a free-standing span declaration must name its entry");
-        assert!(error.to_string().contains("requires `entry`"));
+            .expect_err("a free-standing span declaration must name its entrypoint");
+        assert!(error.to_string().contains("requires `entrypoint`"));
         assert!(
-            validate_span_declaration(quote! { entry = crate::checkout::run }).is_err(),
+            validate_span_declaration(quote! { entrypoint = crate::checkout::run }).is_err(),
             "a span declaration still requires `id`"
         );
     }

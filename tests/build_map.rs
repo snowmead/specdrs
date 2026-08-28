@@ -21,13 +21,13 @@ fn builds_spans_items_axes_ranges_and_evidence() {
     .build()
     .expect("fixture map should build");
 
-    assert_eq!(map.schema, 2);
+    assert_eq!(map.schema, 3);
     assert_eq!(map.crate_name, "payments");
     assert_eq!(map.spans.len(), 4);
 
     let checkout = map.spans.iter().find(|span| span.id == "checkout").unwrap();
     assert_eq!(checkout.id, "checkout");
-    assert_eq!(checkout.entry, "payments::charge");
+    assert_eq!(checkout.entrypoint, "payments::charge");
     for member in [
         "payments::charge",
         "payments::inline_member",
@@ -62,7 +62,7 @@ fn builds_spans_items_axes_ranges_and_evidence() {
     );
 
     let audit = map.spans.iter().find(|span| span.id == "audit").unwrap();
-    assert_eq!(audit.entry, "payments::charge");
+    assert_eq!(audit.entrypoint, "payments::charge");
     assert_eq!(
         audit.members,
         [
@@ -71,7 +71,7 @@ fn builds_spans_items_axes_ranges_and_evidence() {
             "payments::stripe::capture",
             "payments::stripe::inherited_shapes::Gateway::send",
         ],
-        "an attribute host and its distinct entry are both direct members"
+        "an attribute host and its distinct entrypoint are both direct members"
     );
     assert_eq!(map.items["payments::audit"].spans, ["audit"]);
     assert_eq!(map.items["payments::charge"].spans, ["audit", "checkout"]);
@@ -104,8 +104,8 @@ fn builds_spans_items_axes_ranges_and_evidence() {
 
     let gateway = map.spans.iter().find(|span| span.id == "gateway").unwrap();
     assert_eq!(
-        gateway.entry, "payments::stripe::inherited_shapes::Gateway::send",
-        "`entry = self::Gateway::send` resolves against the declaring module"
+        gateway.entrypoint, "payments::stripe::inherited_shapes::Gateway::send",
+        "`entrypoint = self::Gateway::send` resolves against the declaring module"
     );
     assert_eq!(gateway.parent.as_deref(), Some("checkout"));
     assert_eq!(
@@ -128,14 +128,14 @@ fn builds_spans_items_axes_ranges_and_evidence() {
 
     let ledger = map.spans.iter().find(|span| span.id == "ledger").unwrap();
     assert_eq!(
-        ledger.entry, "payments::stripe::capture",
-        "`entry = self::capture` resolves against the declaring module"
+        ledger.entrypoint, "payments::stripe::capture",
+        "`entrypoint = self::capture` resolves against the declaring module"
     );
     assert_eq!(ledger.parent.as_deref(), Some("checkout"));
     assert_eq!(
         ledger.members,
         ["payments::stripe::capture"],
-        "the resolved entry is the span's only member and no host item is synthesized"
+        "the resolved entrypoint is the span's only member and no host item is synthesized"
     );
     assert_eq!(
         ledger.axes[&Axis::Invariants].claims[0].evidence[0].result,
@@ -184,8 +184,9 @@ fn emitted_json_uses_the_versioned_public_shape() {
         .find(|span| span["id"] == "checkout")
         .unwrap();
 
-    assert_eq!(json["schema"], 2);
+    assert_eq!(json["schema"], 3);
     assert_eq!(json["crate"], "payments");
+    assert_eq!(checkout["entrypoint"], "payments::charge");
     assert_eq!(checkout["axes"]["Job"]["status"], "Specified");
     assert_eq!(checkout["axes"]["Job"]["claims"][0]["kind"], "Objective");
 }

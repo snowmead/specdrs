@@ -13,15 +13,15 @@ Import the macros with `use specdrs::prelude::*;`.
 ## what to compose
 
 A span is a named semantic cut across Rust items. It has a stable id, one reading
-entry, optional parent, explicit members, and optional claims. Choose the smallest
+entrypoint, optional parent, explicit members, and optional claims. Choose the smallest
 span that contains the decision. Split independent jobs before encoding them.
 
 An item is one Rust item identified by its definition path. Item claims apply only
 to that item. Calling a function does not make it a member. Membership is explicit.
-A span declared with #[specdrs] makes both its host and resolved entry direct
+A span declared with #[specdrs] makes both its host and resolved entrypoint direct
 members. If they are the same item, the membership appears once. A specdrs_span!
-declaration has no host, so only its resolved entry joins automatically. An impl
-has no item identity; its resolved entry and methods become direct members instead.
+declaration has no host, so only its resolved entrypoint joins automatically. An impl
+has no item identity; its resolved entrypoint and methods become direct members instead.
 
 A claim is one independently falsifiable proposition: a stable alias, one sentence
 of prose, one kind, and one axis.
@@ -61,11 +61,11 @@ merely participates does not need its own claims. Join it with membership.
 
 #[specdrs(...)] attaches to a real Rust item. It can declare a span, join spans,
 and own item claims. Declaring a span makes the host a direct member even when
-entry names another item. rust-analyzer shows the generated ## specdrs section
+entrypoint names another item. rust-analyzer shows the generated ## specdrs section
 on hover.
 
-specdrs_span!(...) declares a span with no host item. Name `entry`. Use this at
-the crate root, or for a cut that no single item should own. The resolved entry
+specdrs_span!(...) declares a span with no host item. Name `entrypoint`. Use this at
+the crate root, or for a cut that no single item should own. The resolved entrypoint
 becomes a member. No hover.
 
 specdrs_module!(in_spans(...)) enrolls the containing module and every descendant.
@@ -87,7 +87,7 @@ Crate-level or cross-module span:
 
     specdrs_span!(
         id = "checkout",
-        entry = crate::checkout::run,
+        entrypoint = crate::checkout::run,
         claims(
             Objectives(
                 Job("Complete one commercial checkout." as complete_checkout),
@@ -130,12 +130,12 @@ Module-wide membership, then one host declares the span:
 
     specdrs_module!(in_spans("command-line-interface"));
 
-    #[specdrs(span(id = "command-line-interface", parent = "specdrs", entry = crate::cli::run_cli))]
+    #[specdrs(span(id = "command-line-interface", parent = "specdrs", entrypoint = crate::cli::run_cli))]
     pub fn run_cli(...) { ... }
 
 Container grouping (every method in the impl is a member):
 
-    #[specdrs(span(id = "gateway", parent = "checkout", entry = self::Gateway::send))]
+    #[specdrs(span(id = "gateway", parent = "checkout", entrypoint = self::Gateway::send))]
     impl Gateway {
         pub fn send(&self) {}
         pub fn retry(&self) {}
@@ -144,9 +144,9 @@ Container grouping (every method in the impl is a member):
 Cross-boundary grouping. Do not declare the span on one container and join it
 from another module. Declare a host-free parent, then join that:
 
-    specdrs_span!(id = "payments", entry = crate::checkout::run);
+    specdrs_span!(id = "payments", entrypoint = crate::checkout::run);
 
-    #[specdrs(span(id = "gateway", parent = "payments", entry = self::Gateway::send))]
+    #[specdrs(span(id = "gateway", parent = "payments", entrypoint = self::Gateway::send))]
     impl Gateway { ... }
 
     #[specdrs(in_spans("payments"))]
@@ -165,7 +165,7 @@ Test, Fuzz, Proof, and Lint.
 
 how prints this guide. It accepts no arguments.
 
-emit writes the schema 2 map. Default path: <package>/target/specdrs/<crate>.json.
+emit writes the schema 3 map. Default path: <package>/target/specdrs/<crate>.json.
 
 check is the static gate. Syntax, structure, references, evidence links. No model.
 A failure names the broken annotation and the pattern to write.

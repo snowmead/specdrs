@@ -537,7 +537,7 @@ impl Args {
                     if let Some(parent) = &span.parent {
                         println!("parent: {parent}");
                     }
-                    println!("entry: {}", span.entry);
+                    println!("entrypoint: {}", span.entrypoint);
                     println!("members:");
                     for member in &span.members {
                         println!("  {member}");
@@ -797,7 +797,7 @@ mod tests {
         assert!(AUTHORING_GUIDE.contains("specdrs_module!"));
         assert!(AUTHORING_GUIDE.contains("Objectives"));
         assert!(AUTHORING_GUIDE.contains("in_spans"));
-        assert!(AUTHORING_GUIDE.contains("makes both its host and resolved entry"));
+        assert!(AUTHORING_GUIDE.contains("makes both its host and resolved entrypoint"));
         assert!(AUTHORING_GUIDE.contains("read the diagnostic"));
         assert!(!AUTHORING_GUIDE.contains("what the scanner enforces"));
     }
