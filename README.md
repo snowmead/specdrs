@@ -9,13 +9,16 @@ Pronounced /ˈspɛkt ɑːr ɛs/ (*specked-R-S*).
 An agent that writes code will invent decisions you never agreed to.
 `specdrs` is the loop that stops that.
 
-It supersedes the grill-me skill. The grilling stays but the difference is
-structure and persistence: the human and the agent align on intent and
-objectives, and accepted decisions become claims in the crate, next to the
-code they govern, instead of a transcript that evaporates or a document
-that sits outside the code. When a later change opens a new decision, at
-the feature or at one function, the agent has to ask. An unspecified
-concern is not a default. It is an unmade decision.
+What this achieves:
+
+- Aligns the human and the agent on intent and objectives
+- Accepted decisions become claims in the crate, next to the code they govern
+- Agents can read the decisions made that shaped the code directly from the source
+- Replaces the basic grill-me skill with a engineering focused approach
+
+The `specdrs` skill is language-agnostic but it works best in the supported languages:
+
+- Rust
 
 Run `/specdrs` so the agent follows that loop for a design, a feature, or a bug
 fix.
