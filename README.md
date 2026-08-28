@@ -4,10 +4,12 @@
 [![CI](https://github.com/snowmead/specdrs/actions/workflows/ci.yml/badge.svg)](https://github.com/snowmead/specdrs/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
+Pronounced /ˈspɛkt ɑːr ɛs/ (*specked-R-S*).
+
 An agent that writes code will invent decisions you never agreed to.
 `specdrs` is the loop that stops that.
 
-It supersedes the grill-me skill. The grilling stays. The difference is
+It supersedes the grill-me skill. The grilling stays but the difference is
 structure and persistence: the human and the agent align on intent and
 objectives, and accepted decisions become claims in the crate, next to the
 code they govern, instead of a transcript that evaporates or a document
