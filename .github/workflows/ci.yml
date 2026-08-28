@@ -25,9 +25,7 @@ jobs:
         run: rustup toolchain install 1.98.0 --profile minimal --component clippy,rustfmt --no-self-update
 
       - name: Fetch dependencies
-        run: |
-          cargo fetch --locked
-          cargo fetch --locked --manifest-path tests/fixtures/payments/Cargo.toml
+        run: cargo fetch --locked
 
       - name: Check formatting
         run: cargo fmt --all -- --check

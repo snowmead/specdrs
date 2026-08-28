@@ -12,6 +12,9 @@ The workspace contains three public crates:
 2. `specdrs-macros`
 3. `specdrs`
 
+`tests/fixtures/payments` is an unpublished workspace member. It shares the
+root lockfile so a version bump does not need a second lockfile update.
+
 release-plz publishes them in dependency order. The two internal crates do not
 create Git tags or GitHub Releases. The root `specdrs` crate creates the single
 product tag `v<version>` and the corresponding GitHub Release.

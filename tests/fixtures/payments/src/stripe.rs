@@ -2,6 +2,7 @@ use specdrs::prelude::*;
 
 specdrs_module!(in_spans("checkout"));
 
+#[rustfmt::skip]
 specdrs_span!(
     id = "ledger",
     parent = "checkout",

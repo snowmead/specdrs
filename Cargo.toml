@@ -1,5 +1,5 @@
 [workspace]
-members = ["specdrs-macros", "specdrs-syntax"]
+members = ["specdrs-macros", "specdrs-syntax", "tests/fixtures/payments"]
 resolver = "3"
 
 [package]
