@@ -26,6 +26,12 @@ use crate::{
     ProjectedClaim,
     TargetFilter, //
 };
+use anyhow::{
+    Context as _,
+    Result,
+    anyhow,
+    bail, //
+};
 use serde::Serialize;
 
 use crate::prelude::*;
@@ -98,7 +104,7 @@ pub fn run_cli(args: impl IntoIterator<Item = String>) -> ExitCode {
     match run(args.into_iter().collect()) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
-            eprintln!("error: {error}");
+            eprintln!("error: {error:#}");
             ExitCode::FAILURE
         }
     }
@@ -109,7 +115,7 @@ pub fn run_cli(args: impl IntoIterator<Item = String>) -> ExitCode {
 /// # Errors
 ///
 /// Returns an error when the command or any command argument is invalid, or when execution fails.
-fn run(mut args: Vec<String>) -> Result<(), String> {
+fn run(mut args: Vec<String>) -> Result<()> {
     if args.first().is_some_and(|arg| arg == "specdrs") {
         args.remove(0);
     }
@@ -132,7 +138,7 @@ fn run(mut args: Vec<String>) -> Result<(), String> {
             println!("specdrs {}", env!("CARGO_PKG_VERSION"));
             Ok(())
         }
-        unknown => Err(format!(
+        unknown => Err(anyhow!(
             "unknown command `{unknown}`\n\nRun `cargo specdrs help`."
         )),
     }
@@ -176,7 +182,7 @@ impl Args {
         ),
     )
     )]
-    fn parse(args: &[String]) -> Result<Self, String> {
+    fn parse(args: &[String]) -> Result<Self> {
         let mut parsed = Self {
             build: BuildOptions::default(),
             stdout: false,
@@ -222,7 +228,7 @@ impl Args {
                     parsed.jobs = Some(
                         value
                             .parse::<usize>()
-                            .map_err(|_| format!("invalid --jobs value `{value}`"))?,
+                            .map_err(|_| anyhow!("invalid --jobs value `{value}`"))?,
                     );
                 }
                 "--span" => {
@@ -237,9 +243,9 @@ impl Args {
                         .items
                         .push(Self::required_value(args, index, "--item")?.to_owned());
                 }
-                value if value.starts_with('-') => return Err(format!("unknown option `{value}`")),
+                value if value.starts_with('-') => bail!("unknown option `{value}`"),
                 value if parsed.query.is_none() => parsed.query = Some(value.to_owned()),
-                value => return Err(format!("unexpected argument `{value}`")),
+                value => bail!("unexpected argument `{value}`"),
             }
             index += 1;
         }
@@ -251,8 +257,11 @@ impl Args {
     /// # Errors
     ///
     /// Returns an error when any grouping key is unknown.
-    fn parse_grouping(value: &str) -> Result<Vec<GroupKey>, String> {
-        value.split(',').map(str::parse).collect()
+    fn parse_grouping(value: &str) -> Result<Vec<GroupKey>> {
+        value
+            .split(',')
+            .map(|key| key.parse().map_err(anyhow::Error::msg))
+            .collect()
     }
 
     /// Reports whether any analysis target was named.
@@ -289,14 +298,10 @@ impl Args {
     /// # Errors
     ///
     /// Returns an error when the option has no following value.
-    fn required_value<'a>(
-        args: &'a [String],
-        index: usize,
-        option: &str,
-    ) -> Result<&'a str, String> {
+    fn required_value<'a>(args: &'a [String], index: usize, option: &str) -> Result<&'a str> {
         args.get(index)
             .map(String::as_str)
-            .ok_or_else(|| format!("{option} requires a value"))
+            .ok_or_else(|| anyhow!("{option} requires a value"))
     }
 }
 
@@ -318,7 +323,7 @@ impl Args {
         ),
     )
     )]
-    fn emit(self) -> Result<(), String> {
+    fn emit(self) -> Result<()> {
         let args = self;
         if args.query.is_some()
             || args.json
@@ -326,16 +331,13 @@ impl Args {
             || args.jobs.is_some()
             || args.has_target_selection()
         {
-            return Err(
-                "emit accepts only --manifest-path, --package, --stdout, and --output".into(),
-            );
+            bail!("emit accepts only --manifest-path, --package, --stdout, and --output");
         }
         if args.stdout && args.output.is_some() {
-            return Err("use either `--stdout` or `--output`, not both".into());
+            bail!("use either `--stdout` or `--output`, not both");
         }
-        let map = args.build.build().map_err(|error| error.to_string())?;
-        let json = serde_json::to_string_pretty(&map)
-            .map_err(|error| format!("cannot serialize knowledge map: {error}"))?;
+        let map = args.build.build()?;
+        let json = serde_json::to_string_pretty(&map).context("cannot serialize knowledge map")?;
         if args.stdout {
             println!("{json}");
             return Ok(());
@@ -346,10 +348,10 @@ impl Args {
             .unwrap_or_else(|| default_output(&args.build, &map));
         if let Some(parent) = output.parent() {
             fs::create_dir_all(parent)
-                .map_err(|error| format!("cannot create {}: {error}", parent.display()))?;
+                .with_context(|| format!("cannot create {}", parent.display()))?;
         }
         fs::write(&output, format!("{json}\n"))
-            .map_err(|error| format!("cannot write {}: {error}", output.display()))?;
+            .with_context(|| format!("cannot write {}", output.display()))?;
         println!("{}", output.display());
         Ok(())
     }
@@ -393,7 +395,7 @@ impl Args {
         ),
     )
     )]
-    fn check(self) -> Result<(), String> {
+    fn check(self) -> Result<()> {
         let args = self;
         if args.stdout
             || args.output.is_some()
@@ -403,9 +405,9 @@ impl Args {
             || args.jobs.is_some()
             || args.has_target_selection()
         {
-            return Err("check accepts only --manifest-path and --package".into());
+            bail!("check accepts only --manifest-path and --package");
         }
-        let map = args.build.build().map_err(|error| error.to_string())?;
+        let map = args.build.build()?;
         let mut unavailable = Vec::new();
         let mut unsupported = Vec::new();
         let mut unspecified = 0;
@@ -441,7 +443,7 @@ impl Args {
         if unavailable.is_empty() {
             Ok(())
         } else {
-            Err(format!(
+            Err(anyhow!(
                 "{} evidence link(s) are unavailable:\n{}",
                 unavailable.len(),
                 unavailable.join("\n")
@@ -514,22 +516,20 @@ impl Args {
         ),
     )
     )]
-    fn show(self) -> Result<(), String> {
+    fn show(self) -> Result<()> {
         let args = self;
         if args.stdout
             || args.output.is_some()
             || args.jobs.is_some()
             || args.has_target_selection()
         {
-            return Err(
-                "show does not accept --stdout, --output, --jobs, --span, or --item".into(),
-            );
+            bail!("show does not accept --stdout, --output, --jobs, --span, or --item");
         }
         let query = args
             .query
             .as_deref()
-            .ok_or_else(|| "show requires a span id or item def path".to_owned())?;
-        let map = args.build.build().map_err(|error| error.to_string())?;
+            .ok_or_else(|| anyhow!("show requires a span id or item def path"))?;
+        let map = args.build.build()?;
         let (target, claims, unspecified) =
             if let Some(span) = map.spans.iter().find(|span| span.id == query) {
                 if !args.json {
@@ -570,9 +570,9 @@ impl Args {
                     unspecified_axes(&item.axes),
                 )
             } else {
-                return Err(format!("no span or item named `{query}`"));
+                bail!("no span or item named `{query}`");
             };
-        let projection = ClaimProjection::new(claims, args.group_by)?;
+        let projection = ClaimProjection::new(claims, args.group_by).map_err(anyhow::Error::msg)?;
         if args.json {
             let output = ShowJson {
                 schema: 1,
@@ -582,8 +582,7 @@ impl Args {
             };
             println!(
                 "{}",
-                serde_json::to_string_pretty(&output)
-                    .map_err(|error| format!("cannot serialize projection: {error}"))?
+                serde_json::to_string_pretty(&output).context("cannot serialize projection")?
             );
         } else {
             print_projection(&projection);
@@ -665,33 +664,31 @@ impl Args {
     /// # Errors
     ///
     /// Returns an error for incompatible options, runtime failures, analysis failures, or non-passing reports.
-    fn analyze(self) -> Result<(), String> {
+    fn analyze(self) -> Result<()> {
         let args = self;
         if args.stdout || args.output.is_some() || args.query.is_some() || args.group_by_set {
-            return Err(
-                "analyze accepts only --manifest-path, --package, --jobs, --span, --item, and --json".into(),
+            bail!(
+                "analyze accepts only --manifest-path, --package, --jobs, --span, --item, and --json"
             );
         }
         let targets = args.target_filter();
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
-            .map_err(|error| format!("cannot start analyzer runtime: {error}"))?;
-        let report = runtime
-            .block_on(
-                AnalyzeOptions {
-                    build: args.build,
-                    jobs: args.jobs,
-                    targets,
-                }
-                .analyze(),
-            )
-            .map_err(|error| error.to_string())?;
+            .context("cannot start analyzer runtime")?;
+        let report = runtime.block_on(
+            AnalyzeOptions {
+                build: args.build,
+                jobs: args.jobs,
+                targets,
+            }
+            .analyze(),
+        )?;
         if args.json {
             println!(
                 "{}",
                 serde_json::to_string_pretty(&report)
-                    .map_err(|error| format!("cannot serialize analysis report: {error}"))?
+                    .context("cannot serialize analysis report")?
             );
         } else {
             print_analysis(&report);
@@ -699,7 +696,7 @@ impl Args {
         if report.passed() {
             Ok(())
         } else {
-            Err("analysis did not pass".into())
+            Err(anyhow!("analysis did not pass"))
         }
     }
 }
@@ -757,9 +754,9 @@ fn print_analysis(report: &AnalysisReport) {
 /// Returns an error when any argument is supplied.
 const AUTHORING_GUIDE: &str = include_str!("how.txt");
 
-fn print_how(args: &[String]) -> Result<(), String> {
+fn print_how(args: &[String]) -> Result<()> {
     if let Some(argument) = args.first() {
-        return Err(format!(
+        return Err(anyhow!(
             "how accepts no arguments\n\nunexpected argument `{argument}`"
         ));
     }
@@ -807,8 +804,9 @@ mod tests {
     #[test]
     fn how_rejects_arguments() {
         let error = run(vec!["how".into(), "checkout".into()]).unwrap_err();
-        assert!(error.contains("no arguments"));
-        assert!(error.contains("checkout"));
+        let message = error.to_string();
+        assert!(message.contains("no arguments"));
+        assert!(message.contains("checkout"));
     }
 
     #[test]
@@ -820,7 +818,7 @@ mod tests {
             "map.json".into(),
         ])
         .unwrap_err();
-        assert!(error.contains("either"));
+        assert!(error.to_string().contains("either"));
     }
 
     #[test]

@@ -30,7 +30,6 @@ use crate::prelude::*;
 
 use specdrs_syntax::{
     impl_cannot_own_claims,
-    impl_span_requires_entry,
     specdrs_module_requires_in_spans,
     specdrs_requires_arguments,
     specdrs_span_requires_entry, //
@@ -40,9 +39,9 @@ use crate::attribute::{
     ClaimArgs,
     ClaimsArgs,
     Directive,
-    SpecdrsArgs,
     NotApplicableArgs,
     SpanArgs, //
+    SpecdrsArgs,
 };
 use crate::model::{
     Axis,
@@ -922,8 +921,8 @@ impl FileScan {
                         Directive::Span(declaration) => {
                             let Some(entry) = declaration.entry.clone() else {
                                 self.errors.push(format!(
-                                    "{display_file}:{line}: {}",
-                                    impl_span_requires_entry(&declaration.id)
+                                    "{display_file}:{line}: span `{}` declared on an impl block requires `entry`; an impl block has no def path to default to. Write span(id = \"{}\", entry = self::Type::method)",
+                                    declaration.id, declaration.id
                                 ));
                                 continue;
                             };
@@ -1069,17 +1068,12 @@ fn parse_annotations(
             .is_some_and(|part| part.ident == "specdrs")
     }) {
         let syn::Meta::List(list) = &attr.meta else {
-            errors.push(format!(
-                "{file}:{line}: {}",
-                specdrs_requires_arguments()
-            ));
+            errors.push(format!("{file}:{line}: {}", specdrs_requires_arguments()));
             continue;
         };
         match syn::parse2(list.tokens.clone()) {
             Ok(args) => annotations.push(args),
-            Err(error) => errors.push(format!(
-                "{file}:{line}: invalid specdrs attribute: {error}"
-            )),
+            Err(error) => errors.push(format!("{file}:{line}: invalid specdrs attribute: {error}")),
         }
     }
     annotations
@@ -1172,10 +1166,7 @@ fn module_span_declarations(
             }
         };
         let Some(entry) = span.entry else {
-            errors.push(format!(
-                "{file}:{line}: {}",
-                specdrs_span_requires_entry()
-            ));
+            errors.push(format!("{file}:{line}: {}", specdrs_span_requires_entry()));
             continue;
         };
         declarations.push(ScannedSpan {

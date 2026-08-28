@@ -10,6 +10,12 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
+use anyhow::{
+    Context as _,
+    Result as AnyResult,
+    anyhow,
+    bail, //
+};
 use rig::client::Nothing;
 use rig::prelude::*;
 use rig::providers::ollama;
@@ -217,15 +223,25 @@ impl AnalysisReport {
 
 #[derive(Debug)]
 /// Reports a failure to configure, prepare, or execute semantic analysis.
-pub struct AnalyzeError(String);
+pub struct AnalyzeError(anyhow::Error);
 
-impl fmt::Display for AnalyzeError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(&self.0)
+impl From<anyhow::Error> for AnalyzeError {
+    fn from(error: anyhow::Error) -> Self {
+        Self(error)
     }
 }
 
-impl std::error::Error for AnalyzeError {}
+impl fmt::Display for AnalyzeError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl std::error::Error for AnalyzeError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.0.chain().nth(1)
+    }
+}
 
 #[derive(Debug, Clone, Deserialize)]
 /// Contains the effective analyzer configuration for one package.
@@ -404,14 +420,9 @@ impl AnalyzeOptions {
     )
     )]
     pub async fn analyze(&self) -> Result<AnalysisReport, AnalyzeError> {
-        let map = self
-            .build
-            .build()
-            .map_err(|error| AnalyzeError(error.to_string()))?;
-        let (workspace_root, package_root, package_name) = self
-            .build
-            .project_roots()
-            .map_err(|error| AnalyzeError(error.to_string()))?;
+        let map = self.build.build().map_err(anyhow::Error::from)?;
+        let (workspace_root, package_root, package_name) =
+            self.build.project_roots().map_err(anyhow::Error::from)?;
         let mut config = AnalyzerConfig::load(&workspace_root, &package_name)?;
         if let Some(jobs) = self.jobs {
             config.max_concurrency = jobs;
@@ -422,7 +433,7 @@ impl AnalyzeOptions {
             .api_key(Nothing)
             .base_url(&config.base_url)
             .build()
-            .map_err(|error| AnalyzeError(format!("cannot configure Ollama: {error}")))?;
+            .context("cannot configure Ollama")?;
         let analyzer = Analyzer {
             agent: Arc::new(
                 client
@@ -453,14 +464,16 @@ impl AnalyzeOptions {
                 let permit = semaphore.acquire_owned().await;
                 let result = match permit {
                     Ok(_permit) => analyzer.run(prompt, &claim_ids, &source_ranges).await,
-                    Err(error) => Err(format!("analysis queue closed: {error}")),
+                    Err(error) => Err(anyhow!("analysis queue closed: {error}")),
                 };
                 AnalyzedTarget {
                     target,
                     sources: source_ranges,
                     result: match result {
                         Ok(verdict) => AnalysisExecution::Completed { verdict },
-                        Err(message) => AnalysisExecution::Error { message },
+                        Err(error) => AnalysisExecution::Error {
+                            message: format!("{error:#}"),
+                        },
                     },
                 }
             });
@@ -471,7 +484,7 @@ impl AnalyzeOptions {
             match result {
                 Ok(item) => results.push(item),
                 Err(error) => {
-                    return Err(AnalyzeError(format!("analyzer task failed: {error}")));
+                    return Err(anyhow!("analyzer task failed: {error}").into());
                 }
             }
         }
@@ -505,7 +518,7 @@ impl TargetFilter {
         ),
     )
     )]
-    fn validate(&self, map: &KnowledgeMap) -> Result<(), AnalyzeError> {
+    fn validate(&self, map: &KnowledgeMap) -> AnyResult<()> {
         let Self::Named { spans, items } = self else {
             return Ok(());
         };
@@ -521,7 +534,7 @@ impl TargetFilter {
             return Ok(());
         }
         rejected.sort();
-        Err(AnalyzeError(rejected.join("\n")))
+        Err(anyhow!(rejected.join("\n")))
     }
 
     /// Describes why one selected target cannot be audited, if it cannot.
@@ -582,7 +595,7 @@ impl AnalysisJob {
         map: &KnowledgeMap,
         package_root: &Path,
         targets: &TargetFilter,
-    ) -> Result<Vec<Self>, AnalyzeError> {
+    ) -> AnyResult<Vec<Self>> {
         targets.validate(map)?;
         let mut jobs = Vec::new();
         for span in &map.spans {
@@ -597,7 +610,7 @@ impl AnalysisJob {
                 .members
                 .iter()
                 .map(|path| Self::source(map, package_root, path))
-                .collect::<Result<Vec<_>, _>>()?;
+                .collect::<AnyResult<Vec<_>>>()?;
             jobs.push(AnalysisJob {
                 target: AnalysisTarget::Span {
                     id: span.id.clone(),
@@ -636,12 +649,11 @@ impl AnalysisJob {
         map: &KnowledgeMap,
         package_root: &Path,
         item_path: &str,
-    ) -> Result<AnalysisSource, AnalyzeError> {
-        let item = map.items.get(item_path).ok_or_else(|| {
-            AnalyzeError(format!(
-                "span member `{item_path}` has no emitted source item"
-            ))
-        })?;
+    ) -> AnyResult<AnalysisSource> {
+        let item = map
+            .items
+            .get(item_path)
+            .ok_or_else(|| anyhow!("span member `{item_path}` has no emitted source item"))?;
         Ok(AnalysisSource {
             item: item_path.to_owned(),
             source: item.source.clone(),
@@ -661,13 +673,13 @@ impl Analyzer {
         prompt: String,
         claim_ids: &BTreeSet<String>,
         source_ranges: &[SourceRange],
-    ) -> Result<AnalysisVerdict, String> {
+    ) -> AnyResult<AnalysisVerdict> {
         let response = timeout(self.timeout, self.agent.prompt(prompt))
             .await
-            .map_err(|_| format!("Ollama did not respond within {}s", self.timeout.as_secs()))?
-            .map_err(|error| format!("Ollama request failed: {error}"))?;
-        let verdict: AnalysisVerdict = serde_json::from_str(&response)
-            .map_err(|error| format!("Ollama returned invalid analyzer JSON: {error}"))?;
+            .map_err(|_| anyhow!("Ollama did not respond within {}s", self.timeout.as_secs()))?
+            .context("Ollama request failed")?;
+        let verdict: AnalysisVerdict =
+            serde_json::from_str(&response).context("Ollama returned invalid analyzer JSON")?;
         let verdict = verdict.normalize(claim_ids, source_ranges);
         verdict.validate(claim_ids, source_ranges)?;
         Ok(verdict)
@@ -747,32 +759,30 @@ impl AnalysisVerdict {
         &self,
         claim_ids: &BTreeSet<String>,
         source_ranges: &[SourceRange],
-    ) -> Result<(), String> {
+    ) -> AnyResult<()> {
         if let Self::Fail { findings } = self {
             if findings.is_empty() {
-                return Err("Ollama returned Fail without findings".into());
+                bail!("Ollama returned Fail without findings");
             }
             for finding in findings {
                 if finding.claims.is_empty() {
-                    return Err("Ollama returned a finding without claim IDs".into());
+                    bail!("Ollama returned a finding without claim IDs");
                 }
                 for claim in &finding.claims {
                     if !claim_ids.contains(claim) {
-                        return Err(format!("Ollama returned unknown claim ID `{claim}`"));
+                        bail!("Ollama returned unknown claim ID `{claim}`");
                     }
                 }
                 if finding.ranges.is_empty() {
-                    return Err("Ollama returned a finding without source ranges".into());
+                    bail!("Ollama returned a finding without source ranges");
                 }
                 for range in &finding.ranges {
                     if !source_ranges.iter().any(|allowed| allowed.contains(range)) {
-                        return Err(
-                            "Ollama returned a source range outside the audited sources".into()
-                        );
+                        bail!("Ollama returned a source range outside the audited sources");
                     }
                 }
                 if finding.reason.trim().is_empty() {
-                    return Err("Ollama returned a finding without a reason".into());
+                    bail!("Ollama returned a finding without a reason");
                 }
             }
         }
@@ -804,7 +814,7 @@ impl AnalyzerRequest<'_> {
         target: &AnalysisTarget,
         sources: &[AnalysisSource],
         claims: &[ProjectedClaim],
-    ) -> Result<String, AnalyzeError> {
+    ) -> AnyResult<String> {
         let owner = target.label();
         let (claims, context) = claims
             .iter()
@@ -822,8 +832,7 @@ impl AnalyzerRequest<'_> {
             claims,
             context,
         };
-        serde_json::to_string(&request)
-            .map_err(|error| AnalyzeError(format!("cannot serialize analyzer request: {error}")))
+        serde_json::to_string(&request).context("cannot serialize analyzer request")
     }
 }
 
@@ -857,19 +866,19 @@ impl AnalyzerConfig {
     /// # Errors
     ///
     /// Returns an error when the configuration file is absent, malformed, or incomplete.
-    fn load(workspace_root: &Path, package: &str) -> Result<Self, AnalyzeError> {
+    fn load(workspace_root: &Path, package: &str) -> AnyResult<Self> {
         let path = workspace_root.join("specdrs.toml");
         let source = fs::read_to_string(&path).map_err(|error| {
-        AnalyzeError(format!(
-            "cannot read {}: {error}. Add [analyze] with provider = \"ollama\" and a local Gemma model tag",
-            path.display()
-        ))
-    })?;
-        let config: SpecdrsConfig = toml::from_str(&source)
-            .map_err(|error| AnalyzeError(format!("invalid {}: {error}", path.display())))?;
+            anyhow!(
+                "cannot read {}: {error}. Add [analyze] with provider = \"ollama\" and a local Gemma model tag",
+                path.display()
+            )
+        })?;
+        let config: SpecdrsConfig =
+            toml::from_str(&source).with_context(|| format!("invalid {}", path.display()))?;
         let mut analyze = config
             .analyze
-            .ok_or_else(|| AnalyzeError(format!("{} has no [analyze] table", path.display())))?;
+            .ok_or_else(|| anyhow!("{} has no [analyze] table", path.display()))?;
         if let Some(overrides) = config
             .packages
             .get(package)
@@ -902,32 +911,24 @@ impl AnalyzerConfig {
     /// # Errors
     ///
     /// Returns an error for unsupported providers, empty model tags, or zero-valued limits.
-    fn validate(&self) -> Result<(), AnalyzeError> {
+    fn validate(&self) -> AnyResult<()> {
         if self.provider != "ollama" {
-            return Err(AnalyzeError(format!(
+            return Err(anyhow!(
                 "unsupported analyzer provider `{}`; this build supports `ollama`",
                 self.provider
-            )));
+            ));
         }
         if self.model.trim().is_empty() {
-            return Err(AnalyzeError(
-                "analyze.model must be a local Ollama model tag".into(),
-            ));
+            bail!("analyze.model must be a local Ollama model tag");
         }
         if self.max_concurrency == 0 {
-            return Err(AnalyzeError(
-                "analyze.max_concurrency must be greater than zero".into(),
-            ));
+            bail!("analyze.max_concurrency must be greater than zero");
         }
         if self.timeout_seconds == 0 {
-            return Err(AnalyzeError(
-                "analyze.timeout_seconds must be greater than zero".into(),
-            ));
+            bail!("analyze.timeout_seconds must be greater than zero");
         }
         if self.max_output_tokens == 0 {
-            return Err(AnalyzeError(
-                "analyze.max_output_tokens must be greater than zero".into(),
-            ));
+            bail!("analyze.max_output_tokens must be greater than zero");
         }
         Ok(())
     }
@@ -947,16 +948,13 @@ impl SourceRange {
     /// # Errors
     ///
     /// Returns an error when the source file cannot be read or the recorded range is invalid.
-    fn read(&self, package_root: &Path) -> Result<String, AnalyzeError> {
+    fn read(&self, package_root: &Path) -> AnyResult<String> {
         let path = package_root.join(&self.file);
-        let source = fs::read_to_string(&path)
-            .map_err(|error| AnalyzeError(format!("cannot read {}: {error}", path.display())))?;
-        self.slice(&source).map(str::to_owned).map_err(|error| {
-            AnalyzeError(format!(
-                "invalid source range for {}: {error}",
-                path.display()
-            ))
-        })
+        let source =
+            fs::read_to_string(&path).with_context(|| format!("cannot read {}", path.display()))?;
+        self.slice(&source)
+            .map(str::to_owned)
+            .with_context(|| format!("invalid source range for {}", path.display()))
     }
 
     /// Selects this range from an in-memory source file.
@@ -976,15 +974,15 @@ impl SourceRange {
         ),
     )
 )]
-    fn slice<'a>(&self, source: &'a str) -> Result<&'a str, String> {
+    fn slice<'a>(&self, source: &'a str) -> AnyResult<&'a str> {
         let start = self.start.offset(source)?;
         let end = self.end.offset(source)?;
         if start > end {
-            return Err("start is after end".into());
+            bail!("start is after end");
         }
         source
             .get(start..end)
-            .ok_or_else(|| "range does not end on UTF-8 boundaries".into())
+            .ok_or_else(|| anyhow!("range does not end on UTF-8 boundaries"))
     }
 }
 
@@ -994,9 +992,9 @@ impl SourcePosition {
     /// # Errors
     ///
     /// Returns an error when the line or column lies outside the source.
-    fn offset(self, source: &str) -> Result<usize, String> {
+    fn offset(self, source: &str) -> AnyResult<usize> {
         if self.line == 0 {
-            return Err("line numbers are one-based".into());
+            bail!("line numbers are one-based");
         }
         let line_start = if self.line == 1 {
             0
@@ -1005,16 +1003,17 @@ impl SourcePosition {
                 .match_indices('\n')
                 .nth(self.line - 2)
                 .map(|(index, _)| index + 1)
-                .ok_or_else(|| format!("line {} does not exist", self.line))?
+                .ok_or_else(|| anyhow!("line {} does not exist", self.line))?
         };
         let offset = line_start + self.column;
         let line_end = source[line_start..]
             .find('\n')
             .map_or(source.len(), |relative| line_start + relative);
         if offset > line_end {
-            return Err(format!(
+            return Err(anyhow!(
                 "column {} is outside line {}",
-                self.column, self.line
+                self.column,
+                self.line
             ));
         }
         Ok(offset)
@@ -1024,6 +1023,17 @@ impl SourcePosition {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn analyze_error_exposes_each_context_once() {
+        let source = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied");
+        let error = AnalyzeError(anyhow::Error::new(source).context("cannot read config"));
+
+        assert_eq!(
+            format!("{:#}", anyhow::Error::new(error)),
+            "cannot read config: denied"
+        );
+    }
 
     fn axes_with_claim(id: &str) -> BTreeMap<crate::Axis, crate::AxisEntry> {
         let mut axes = crate::Axis::empty_map();
@@ -1071,7 +1081,7 @@ mod tests {
                 }],
             )
             .unwrap_err();
-        assert!(error.contains("without findings"));
+        assert!(error.to_string().contains("without findings"));
     }
 
     #[test]
@@ -1116,10 +1126,8 @@ max_concurrency = 2
 
     /// Creates a scratch package root holding the two-function source the scope fixture describes.
     fn scope_root(label: &str) -> std::path::PathBuf {
-        let root = std::env::temp_dir().join(format!(
-            "specdrs-analysis-{label}-{}",
-            std::process::id()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("specdrs-analysis-{label}-{}", std::process::id()));
         fs::create_dir_all(root.join("src")).unwrap();
         fs::write(root.join("src/lib.rs"), "fn work() {}\nfn child() {}\n").unwrap();
         root
@@ -1347,7 +1355,7 @@ max_concurrency = 2
                 &[allowed],
             )
             .unwrap_err();
-        assert!(error.contains("outside the audited sources"));
+        assert!(error.to_string().contains("outside the audited sources"));
     }
 
     #[test]
