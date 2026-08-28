@@ -4,12 +4,13 @@ version = "0.1.0"
 edition = "2024"
 description = "Attribute macros for specdrs knowledge maps"
 license = "Apache-2.0"
+repository = "https://github.com/snowmead/specdrs"
 
 [lib]
 proc-macro = true
 
 [dependencies]
-specdrs-syntax = { path = "../specdrs-syntax" }
+specdrs-syntax = { version = "0.1.0", path = "../specdrs-syntax" }
 proc-macro2 = "1"
 quote = "1"
 syn = { version = "2", features = ["full", "parsing"] }

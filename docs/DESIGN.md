@@ -1,4 +1,4 @@
-# specdrs knowledge maps
+# specdrs design
 
 This crate reads `#[specdrs(...)]` attributes from Rust source and emits a JSON map. The map names semantic spans, claims, evidence, Rust item paths, and exact source ranges.
 

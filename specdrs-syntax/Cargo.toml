@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 description = "Parser for specdrs knowledge-map attributes"
 license = "Apache-2.0"
+repository = "https://github.com/snowmead/specdrs"
 
 [dependencies]
 quote = "1"

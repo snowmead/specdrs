@@ -78,21 +78,34 @@ The scanner and proc macro share the same grammar. Invalid annotations fail both
 Only `cargo specdrs analyze` contacts a model. `how`, `emit`, `check`, and `show`
 are local and deterministic.
 
-## Quick start
+## Install
 
-Install the Cargo subcommand from this checkout:
+Install the agent skill:
 
 ```console
-cargo install --path .
+bunx skills add snowmead/specdrs --skill specdrs
 ```
 
-Add `specdrs` to the crate being mapped. Use the path to this checkout while the
-crate is not sourced from a registry:
+Install the Cargo subcommand:
+
+```console
+cargo install specdrs --locked
+```
+
+Add `specdrs` to the crate being mapped:
+
+```console
+cargo add specdrs
+```
+
+The equivalent manifest entry is:
 
 ```toml
 [dependencies]
-specdrs = { path = "../specdrs" }
+specdrs = "0.1"
 ```
+
+## Quick start
 
 Import the authoring macros:
 
@@ -322,8 +335,9 @@ cargo run --bin cargo-specdrs -- show specdrs
 cargo run --bin cargo-specdrs -- emit --stdout
 ```
 
-See [DESIGN.md](DESIGN.md) for parser rules, map invariants, analyzer behavior,
-and the crate's dogfood span hierarchy.
+See [the design document](docs/DESIGN.md) for parser rules, map invariants,
+analyzer behavior, and the crate's dogfood span hierarchy. Maintainers should
+also read [the release process](docs/RELEASE.md) before publishing.
 
 ## Current boundaries
 

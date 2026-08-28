@@ -8,6 +8,9 @@ version = "0.1.0"
 edition = "2024"
 description = "Compile evidence-linked engineering knowledge maps from Rust items"
 license = "Apache-2.0"
+repository = "https://github.com/snowmead/specdrs"
+readme = "README.md"
+exclude = [".github/", "mise.toml", "prek.toml", "release-plz.toml"]
 
 [lib]
 path = "src/lib.rs"
@@ -26,8 +29,8 @@ harness = false
 
 [dependencies]
 anyhow = "1"
-specdrs-macros = { path = "specdrs-macros" }
-specdrs-syntax = { path = "specdrs-syntax" }
+specdrs-macros = { version = "0.1.0", path = "specdrs-macros" }
+specdrs-syntax = { version = "0.1.0", path = "specdrs-syntax" }
 proc-macro2 = { version = "1", features = ["span-locations"] }
 quote = "1"
 rig = { version = "=0.42.0", default-features = false, features = ["agent", "derive", "rustls"] }
