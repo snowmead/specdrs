@@ -18,6 +18,10 @@ span that contains the decision. Split independent jobs before encoding them.
 
 An item is one Rust item identified by its definition path. Item claims apply only
 to that item. Calling a function does not make it a member. Membership is explicit.
+A span declared with #[specdrs] makes both its host and resolved entry direct
+members. If they are the same item, the membership appears once. A specdrs_span!
+declaration has no host, so only its resolved entry joins automatically. An impl
+has no item identity; its resolved entry and methods become direct members instead.
 
 A claim is one independently falsifiable proposition: a stable alias, one sentence
 of prose, one kind, and one axis.
@@ -56,11 +60,13 @@ merely participates does not need its own claims. Join it with membership.
 ## when to use each macro
 
 #[specdrs(...)] attaches to a real Rust item. It can declare a span, join spans,
-and own item claims. rust-analyzer shows the generated ## specdrs section on
-hover.
+and own item claims. Declaring a span makes the host a direct member even when
+entry names another item. rust-analyzer shows the generated ## specdrs section
+on hover.
 
 specdrs_span!(...) declares a span with no host item. Name `entry`. Use this at
-the crate root, or for a cut that no single item should own. No hover.
+the crate root, or for a cut that no single item should own. The resolved entry
+becomes a member. No hover.
 
 specdrs_module!(in_spans(...)) enrolls the containing module and every descendant.
 Use this to stop repeating in_spans on every helper. It cannot declare a span or
@@ -72,8 +78,8 @@ Pick the attachment:
 - No item should carry the declaration -> specdrs_span!
 - Stop repeating in_spans on every helper -> specdrs_module!
 
-A dummy `mod docs {}` that only exists to host a span is the wrong default.
-That is what specdrs_span! is for.
+A dummy `mod docs {}` that only exists to host a span is wrong because the module
+becomes a member. Use specdrs_span! when no host should join.
 
 ## typical patterns
 

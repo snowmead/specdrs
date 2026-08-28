@@ -52,6 +52,16 @@ fn generated_specdrs_docs_follow_authored_docs() {
         "specdrs_span! emits no Rust item, so its claims reach no hover"
     );
 
+    let audit = std::fs::read_to_string(
+        manifest
+            .parent()
+            .expect("fixture manifest should have a parent")
+            .join("target/doc/payments/audit/index.html"),
+    )
+    .expect("audit module rustdoc should exist");
+    assert!(audit.contains("Declares spans:"));
+    assert!(audit.contains("This item is a member of every span it declares."));
+
     // An impl-level declaration DOES reach a hover, unlike specdrs_span!.
     // rustdoc renders it on the implemented type's page, and its heading depth
     // follows the host, so do not assert `<h3 id="specdrs"` here: a method

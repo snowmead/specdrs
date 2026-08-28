@@ -61,6 +61,21 @@ fn builds_spans_items_axes_ranges_and_evidence() {
         EvidenceResult::Linked
     );
 
+    let audit = map.spans.iter().find(|span| span.id == "audit").unwrap();
+    assert_eq!(audit.entry, "payments::charge");
+    assert_eq!(
+        audit.members,
+        [
+            "payments::audit",
+            "payments::charge",
+            "payments::stripe::capture",
+            "payments::stripe::inherited_shapes::Gateway::send",
+        ],
+        "an attribute host and its distinct entry are both direct members"
+    );
+    assert_eq!(map.items["payments::audit"].spans, ["audit"]);
+    assert_eq!(map.items["payments::charge"].spans, ["audit", "checkout"]);
+
     let capture = &map.items["payments::stripe::capture"];
     assert_eq!(capture.source.file, "src/stripe.rs");
     assert!(capture.source.end.line >= capture.source.start.line);

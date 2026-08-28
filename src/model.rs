@@ -239,7 +239,7 @@ pub struct Span {
     pub parent: Option<String>,
     /// Contains the Rust item path where reading starts.
     pub entry: String,
-    /// Contains Rust item paths included in the span.
+    /// Contains Rust item paths assigned directly to the span.
     pub members: Vec<String>,
     /// Contains all semantic axes for the span.
     pub axes: BTreeMap<Axis, AxisEntry>,
@@ -252,7 +252,7 @@ pub struct Item {
     pub source: SourceRange,
     /// Contains the item's normalized Rust signature.
     pub signature: String,
-    /// Contains span identifiers assigned to the item.
+    /// Contains span identifiers assigned directly to the item.
     pub spans: Vec<String>,
     /// Contains all semantic axes for the item.
     pub axes: BTreeMap<Axis, AxisEntry>,

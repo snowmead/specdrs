@@ -49,6 +49,7 @@ fn how_prints_the_authoring_guide() {
     assert!(text.contains("specdrs_module!"));
     assert!(text.contains("Objectives"));
     assert!(text.contains("in_spans"));
+    assert!(text.contains("makes both its host and resolved entry"));
     assert!(!text.starts_with('{'));
 }
 

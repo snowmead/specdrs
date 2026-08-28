@@ -19,6 +19,10 @@ use syn::{Attribute, LitStr, Meta};
 
 /// Attaches specdrs metadata and generated rustdoc to a Rust item.
 ///
+/// Declaring a span makes an addressable host item and the resolved span entry
+/// direct members. An `impl` block has no item identity, so its resolved entry
+/// and methods join instead.
+///
 /// Invalid attribute syntax fails compilation:
 ///
 /// ```compile_fail
@@ -48,7 +52,8 @@ pub fn specdrs_module(input: TokenStream) -> TokenStream {
 ///
 /// The declaration requires `entry`, because no host item can supply a default
 /// def path. The source scanner consumes this declaration. The macro emits no
-/// Rust item, so the span's claims do not appear in any rustdoc hover.
+/// Rust item, so the resolved entry is its only automatic member and the span's
+/// claims do not appear in any rustdoc hover.
 ///
 /// A declaration without `entry` fails compilation:
 ///
@@ -196,6 +201,9 @@ fn render_documentation(annotations: &[SpecdrsArgs], is_impl: bool) -> Option<St
                 .collect::<Vec<_>>(),
         ));
         output.push_str(".\n\n");
+        if !is_impl {
+            output.push_str("This item is a member of every span it declares.\n\n");
+        }
     }
 
     if is_impl {
@@ -356,6 +364,7 @@ mod tests {
         assert_eq!(docs.len(), 1);
         assert_eq!(docs[0].matches("## specdrs").count(), 1);
         assert!(docs[0].contains("Declares spans: `checkout`."));
+        assert!(docs[0].contains("This item is a member of every span it declares."));
         assert!(docs[0].contains("### Span `checkout` claims"));
         assert!(docs[0].contains("### Item claims"));
         assert!(!item.attrs.iter().any(is_specdrs));
@@ -416,6 +425,7 @@ mod tests {
             "{}",
             docs[0]
         );
+        assert!(!docs[0].contains("This item is a member"), "{}", docs[0]);
 
         let error = expand(
             quote! { claims(Constraints(Job("No owner." as no_owner))) },

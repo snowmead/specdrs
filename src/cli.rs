@@ -797,6 +797,7 @@ mod tests {
         assert!(AUTHORING_GUIDE.contains("specdrs_module!"));
         assert!(AUTHORING_GUIDE.contains("Objectives"));
         assert!(AUTHORING_GUIDE.contains("in_spans"));
+        assert!(AUTHORING_GUIDE.contains("makes both its host and resolved entry"));
         assert!(AUTHORING_GUIDE.contains("read the diagnostic"));
         assert!(!AUTHORING_GUIDE.contains("what the scanner enforces"));
     }

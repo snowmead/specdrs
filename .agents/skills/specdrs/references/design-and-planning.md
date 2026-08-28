@@ -13,7 +13,10 @@ apply to the whole semantic cut.
 
 An **item** is one Rust item identified by its definition path. Item claims
 apply only to that item. Calling a function does not make it a span member.
-Membership is explicit.
+Membership is explicit. A span declared with `#[specdrs(span(...))]` makes its
+addressable host and resolved entry direct members. `specdrs_span!` has no host,
+so only its resolved entry joins automatically. An `impl` has no definition
+path; its resolved entry and methods become direct members instead.
 
 Choose the smallest span that contains the decision. Split independent jobs
 before grilling them. The human owns that scope choice.

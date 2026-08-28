@@ -1577,16 +1577,7 @@ impl MapAssembler {
                 .expect("scanned items retain source information");
             item_drafts.entry(def_path.clone()).or_default();
             for id in &item.inherited_spans {
-                item_drafts
-                    .entry(def_path.clone())
-                    .or_default()
-                    .spans
-                    .insert(id.clone());
-                spans
-                    .entry(id.clone())
-                    .or_default()
-                    .members
-                    .insert(def_path.clone());
+                record_span_membership(id, def_path, &mut spans, &mut item_drafts);
             }
             for annotation in &item.annotations {
                 item_drafts.entry(def_path.clone()).or_default();
@@ -1615,6 +1606,7 @@ impl MapAssembler {
                                         .map(|claims| (claims, source.module_path.clone())),
                                     container: None,
                                 },
+                                Some(def_path),
                                 &mut spans,
                                 &mut item_drafts,
                                 &scanned,
@@ -1622,16 +1614,7 @@ impl MapAssembler {
                         }
                         Directive::InSpans(ids) => {
                             for id in ids {
-                                item_drafts
-                                    .entry(def_path.clone())
-                                    .or_default()
-                                    .spans
-                                    .insert(id.clone());
-                                spans
-                                    .entry(id.clone())
-                                    .or_default()
-                                    .members
-                                    .insert(def_path.clone());
+                                record_span_membership(id, def_path, &mut spans, &mut item_drafts);
                             }
                         }
                         Directive::Claims(claims) => item_drafts
@@ -1664,6 +1647,7 @@ impl MapAssembler {
                         .map(|claims| (claims, declaration.module_path)),
                     container: declaration.container,
                 },
+                None,
                 &mut spans,
                 &mut item_drafts,
                 &scanned,
@@ -1810,32 +1794,55 @@ fn resolve_item_reference(
         Constraints(
             Invariants(
                 "A resolved entry that names a scanned item becomes a member of the span and gains the span membership." as entry_is_member,
-                "A declaration whose entry names another item leaves its own host out of the span, unless the host declares the membership itself." as host_is_not_a_member,
+                "An attribute-declared span adds its addressable host as a direct member, including when its entry names another item." as attribute_host_is_member,
             ),
         ),
         evidence(
             entry_is_member(Test = crate::build::tests::builds_own_knowledge_map),
-            host_is_not_a_member(Test = crate::build::tests::builds_own_knowledge_map),
+            attribute_host_is_member(Test = crate::build::tests::attribute_host_and_entry_are_members),
         ),
     )
 )]
 /// Records one resolved span declaration in the span and item drafts.
+///
+/// `host` names an addressable attribute host. Host-free and impl declarations
+/// pass no host.
 fn record_span_declaration(
     id: &str,
     declaration: SpanDeclaration,
+    host: Option<&str>,
     spans: &mut BTreeMap<String, SpanDraft>,
     item_drafts: &mut BTreeMap<String, ItemDraft>,
     scanned: &BTreeMap<String, ScannedItem>,
 ) {
     let entry = declaration.entry.clone();
-    let span = spans.entry(id.to_owned()).or_default();
-    span.declarations.push(declaration);
-    if !scanned.contains_key(&entry) {
-        return;
+    spans
+        .entry(id.to_owned())
+        .or_default()
+        .declarations
+        .push(declaration);
+    for member in [Some(entry.as_str()), host].into_iter().flatten() {
+        if scanned.contains_key(member) {
+            record_span_membership(id, member, spans, item_drafts);
+        }
     }
-    span.members.insert(entry.clone());
+}
+
+#[specdrs(in_spans("knowledge-map-build.map-assembly"))]
+/// Records one direct membership on both sides of the span-item relationship.
+fn record_span_membership(
+    id: &str,
+    item: &str,
+    spans: &mut BTreeMap<String, SpanDraft>,
+    item_drafts: &mut BTreeMap<String, ItemDraft>,
+) {
+    spans
+        .entry(id.to_owned())
+        .or_default()
+        .members
+        .insert(item.to_owned());
     item_drafts
-        .entry(entry)
+        .entry(item.to_owned())
         .or_default()
         .spans
         .insert(id.to_owned());
@@ -1860,8 +1867,8 @@ fn record_span_declaration(
 )]
 /// Rejects members that a container-declared span's container did not contribute.
 ///
-/// A container that seeded no member is a documentation host rather than a grouping,
-/// so its span stays open.
+/// An impl that seeded no methods contributes no container members, so its span
+/// stays open.
 fn validate_container_spans(
     spans: &BTreeMap<String, SpanDraft>,
     container_members: &BTreeMap<String, BTreeSet<String>>,
@@ -2266,6 +2273,71 @@ mod tests {
             identity.axes[&Axis::Invariants].claims[0].evidence[0].result,
             EvidenceResult::Linked
         );
+    }
+
+    #[test]
+    fn attribute_host_and_entry_are_members() {
+        let host = "payments::checkout";
+        let entry = "payments::checkout::run";
+        let scanned = BTreeMap::from([
+            (
+                host.to_owned(),
+                ScannedItem {
+                    source: None,
+                    shape: ItemShape::Other,
+                    annotations: Vec::new(),
+                    inherited_spans: BTreeSet::new(),
+                },
+            ),
+            (
+                entry.to_owned(),
+                ScannedItem {
+                    source: None,
+                    shape: ItemShape::Function { test: false },
+                    annotations: Vec::new(),
+                    inherited_spans: BTreeSet::new(),
+                },
+            ),
+        ]);
+        let mut spans = BTreeMap::new();
+        let mut items = BTreeMap::new();
+
+        record_span_declaration(
+            "checkout",
+            SpanDeclaration {
+                parent: None,
+                entry: entry.to_owned(),
+                claims: None,
+                container: None,
+            },
+            Some(host),
+            &mut spans,
+            &mut items,
+            &scanned,
+        );
+
+        assert_eq!(
+            spans["checkout"].members,
+            BTreeSet::from([host.to_owned(), entry.to_owned()])
+        );
+        assert_eq!(items[host].spans, BTreeSet::from(["checkout".to_owned()]));
+        assert_eq!(items[entry].spans, BTreeSet::from(["checkout".to_owned()]));
+
+        record_span_declaration(
+            "same",
+            SpanDeclaration {
+                parent: None,
+                entry: host.to_owned(),
+                claims: None,
+                container: None,
+            },
+            Some(host),
+            &mut spans,
+            &mut items,
+            &scanned,
+        );
+
+        assert_eq!(spans["same"].members, BTreeSet::from([host.to_owned()]));
     }
 
     #[test]

@@ -6,7 +6,7 @@ Rust remains the program. The generated JSON is disposable output for people, ag
 
 ## model
 
-A span is a named semantic cut across Rust items. It has one reading entry, optional parent, explicit members, and optional claims. A Rust item may belong to several spans and may own its own claims.
+A span is a named semantic cut across Rust items. It has one reading entry, optional parent, explicit direct members, and optional claims. A Rust item may belong to several spans and may own its own claims.
 
 A claim has four fields:
 
@@ -65,16 +65,17 @@ pub fn run(request: Request) -> Result<Receipt, Error> {
 }
 ```
 
-The declaration may sit on a documentation host while pointing to another item:
+An attribute declaration makes its addressable host a direct member. Its resolved
+entry is also a direct member:
 
 ```rust
 #[specdrs(span(id = "checkout", entry = crate::checkout::run))]
-mod checkout_docs {}
+mod checkout {}
 ```
 
-`entry` defaults to the host item's def path, and the resolved entry always becomes a
-member. A host that names another entry is therefore not a member unless it also
-declares `in_spans("checkout")`.
+This adds both `checkout` and `checkout::run`. `entry` defaults to the host item's
+def path, so the same item appears only once when no explicit entry is given. Use
+`specdrs_span!` instead of a dummy documentation host when no host should join.
 
 Members and item claims are compact:
 
@@ -136,8 +137,8 @@ container boundary.
 `in_spans(...)` on a container distributes the same way and composes with the
 declared span, so one method can gather memberships from its block, its module,
 and its own attribute. An `impl` block has no name and no def path, so its
-declaration names `entry` explicitly; a `mod` supplies its own def path and keeps
-the default.
+declaration names `entry` explicitly; a `mod` supplies its own def path, becomes a
+member, and supplies the default entry.
 
 An `impl` block owns no claims. A bare `claims(...)` there is rejected by both the
 proc macro and the scanner, because a claim needs an addressable owner and an impl
@@ -156,8 +157,9 @@ impl Foo  declares S                 specdrs_span!(id = T, ...)
 other::b  ──► S   (in_spans)         other::b ──► T   (in_spans)
 ```
 
-A container that seeds nothing is a documentation host rather than a grouping, so
-its span stays open.
+An `impl` that seeds no methods contributes no container members because it has no
+def path. Its entry still joins and its span stays open. Use `specdrs_span!` instead
+when the empty block would exist only to carry the declaration.
 
 A span can be declared without any host item:
 
@@ -177,13 +179,14 @@ span declared on an `impl` block. Relative paths in `entry` and in evidence bind
 resolve against the module containing the invocation.
 
 The resolved entry becomes a member of the span exactly as it does for an
-attribute declaration. The invocation itself contributes no Rust item, so nothing
-synthetic appears in `items`.
+attribute declaration. The invocation has no host and contributes no Rust item, so
+nothing synthetic appears in `items`.
 
 Rules enforced by the parser and map builder:
 
 - One span declaration for each span ID, whether from an attribute or `specdrs_span!`.
 - Every span entry resolves to a scanned Rust item.
+- An attribute-declared span makes its addressable host and resolved entry direct members.
 - A declaration with no host def path names its entry explicitly: `specdrs_span!` and any `impl` block.
 - A span declared on a container applies to every item inside that container.
 - A container that seeded members accepts no member from outside itself.
@@ -206,6 +209,7 @@ The generated section contains locally authored metadata:
 
 - Direct `in_spans(...)` memberships.
 - Spans declared by that attribute.
+- Automatic membership of a non-impl host in every span it declares.
 - Claims owned by the item or by a span declared on the item.
 - Authored evidence kinds and binders.
 
