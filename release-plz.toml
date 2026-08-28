@@ -11,3 +11,7 @@ changelog_include = ["specdrs-macros", "specdrs-syntax"]
 git_tag_enable = true
 git_tag_name = "v{{ version }}"
 git_release_enable = true
+
+[[package]]
+name = "payments"
+release = false

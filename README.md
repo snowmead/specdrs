@@ -9,12 +9,20 @@ Pronounced /ˈspɛkt ɑːr ɛs/ (*specked-R-S*).
 An agent that writes code will invent decisions you never agreed to.
 `specdrs` is the loop that stops that.
 
+Problems we face post AI:
+
+- Agents leave choices and decisions either in external documentation or in archived transcripts, increasingly harder to mine and synthesize without ambiguity
+- Agents are lazy and will not ask the right questions to make informed decisions
+- Agents cannot infer the meaning and intent of code for big and long running projects without rigorous analysis and token spend
+- Humans lose the ability to verify code being shipped and the correctness of the agent's decisions due to a lack of decision making on their part
+
 What this achieves:
 
-- Aligns the human and the agent on intent and objectives
-- Accepted decisions become claims in the crate, next to the code they govern
+- Agents and Humans align on intent and objectives
 - Agents can read the decisions made that shaped the code directly from the source
-- Replaces the basic grill-me skill with a engineering focused approach
+- Accepted decisions become claims in the crate, next to the code they govern
+
+If you haven't guessed, this replaces the basic grill-me skill with an engineering focused approach.
 
 The `specdrs` skill is language-agnostic but it works best in the supported languages:
 

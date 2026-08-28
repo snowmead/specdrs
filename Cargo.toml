@@ -1,10 +1,10 @@
 [workspace]
-members = ["specdrs-macros", "specdrs-syntax"]
+members = ["specdrs-macros", "specdrs-syntax", "tests/fixtures/payments"]
 resolver = "3"
 
 [package]
 name = "specdrs"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 description = "Compile evidence-linked engineering knowledge maps from Rust items"
 license = "Apache-2.0"

@@ -5,6 +5,12 @@ fn fixture_manifest() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/payments/Cargo.toml")
 }
 
+fn fixture_doc(relative: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("target/doc")
+        .join(relative)
+}
+
 #[test]
 fn generated_specdrs_docs_follow_authored_docs() {
     let manifest = fixture_manifest();
@@ -25,13 +31,8 @@ fn generated_specdrs_docs_follow_authored_docs() {
         String::from_utf8_lossy(&output.stderr)
     );
 
-    let html = std::fs::read_to_string(
-        manifest
-            .parent()
-            .expect("fixture manifest should have a parent")
-            .join("target/doc/payments/stripe/fn.capture.html"),
-    )
-    .expect("capture rustdoc should exist");
+    let html = std::fs::read_to_string(fixture_doc("payments/stripe/fn.capture.html"))
+        .expect("capture rustdoc should exist");
     let authored = html
         .find("Capture an authorized payment.")
         .expect("authored docs should be rendered");
@@ -52,13 +53,8 @@ fn generated_specdrs_docs_follow_authored_docs() {
         "specdrs_span! emits no Rust item, so its claims reach no hover"
     );
 
-    let audit = std::fs::read_to_string(
-        manifest
-            .parent()
-            .expect("fixture manifest should have a parent")
-            .join("target/doc/payments/audit/index.html"),
-    )
-    .expect("audit module rustdoc should exist");
+    let audit = std::fs::read_to_string(fixture_doc("payments/audit/index.html"))
+        .expect("audit module rustdoc should exist");
     assert!(audit.contains("Declares spans:"));
     assert!(audit.contains("This item is a member of every span it declares."));
 
@@ -67,12 +63,9 @@ fn generated_specdrs_docs_follow_authored_docs() {
     // follows the host, so do not assert `<h3 id="specdrs"` here: a method
     // docblock renders `<h6>`, an impl docblock renders deeper than a standalone
     // page, and duplicate heading ids are renumbered in document order.
-    let gateway = std::fs::read_to_string(
-        manifest
-            .parent()
-            .expect("fixture manifest should have a parent")
-            .join("target/doc/payments/stripe/inherited_shapes/struct.Gateway.html"),
-    )
+    let gateway = std::fs::read_to_string(fixture_doc(
+        "payments/stripe/inherited_shapes/struct.Gateway.html",
+    ))
     .expect("Gateway rustdoc should exist");
 
     assert!(gateway.contains("Declares spans:"));
