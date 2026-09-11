@@ -46,7 +46,7 @@ jobs:
           permission-pull-requests: read
 
       - name: Publish unpublished crates
-        uses: release-plz/action@2eb1d8bcb770b4c48ccfaad919734b38b51958c9 # v0.5
+        uses: release-plz/action@503fe65046e8810d4844f6b3aa12ab599a3549d7 # v0.5
         with:
           command: release
         env:
@@ -82,7 +82,7 @@ jobs:
           permission-pull-requests: write
 
       - name: Open or update release pull request
-        uses: release-plz/action@2eb1d8bcb770b4c48ccfaad919734b38b51958c9 # v0.5
+        uses: release-plz/action@503fe65046e8810d4844f6b3aa12ab599a3549d7 # v0.5
         with:
           command: release-pr
         env:
